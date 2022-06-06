@@ -1,0 +1,4 @@
+configargparse==1.5.3
+pytorch-lightning==1.6.4
+torch==1.11.0
+torchvision==0.12

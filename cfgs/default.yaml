@@ -1,0 +1,19 @@
+batch_size: 128
+data_dir: "data"
+dropout_probability: 0
+gpus: 1
+lr: 2e-3
+lr_drop: 0.1
+lr_steps: [55, 70, 85]
+max_epochs: 100
+momentum: 0.9
+optimizer: "sgd"
+refresh_rate: 1
+resnet_version: 50
+resume_training: False
+resume_weights: False
+train_fc_only: False
+val_split: 0.2
+weights: ""
+weight_decay: 1e-4
+workers: 4
