@@ -24,6 +24,7 @@ def add_input_args(parser):
     parser.add("--max_epochs", type=int)
     parser.add("--momentum", type=float)
     parser.add("--optimizer", choices=["adam", "adamw", "sgd"])
+    parser.add("--out_dir")
     parser.add("--refresh_rate", type=int)
     parser.add("--resnet_version", choices=[18, 34, 50, 101, 152], type=int)
     parser.add("--resume_training", action="store_true")

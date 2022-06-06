@@ -8,6 +8,7 @@ lr_steps: [55, 70, 85]
 max_epochs: 100
 momentum: 0.9
 optimizer: "sgd"
+out_dir: "out"
 refresh_rate: 1
 resnet_version: 50
 resume_training: False
