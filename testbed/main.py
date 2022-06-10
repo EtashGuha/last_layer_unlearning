@@ -4,8 +4,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
 
-from .args import parse_args
-from .resnet import ResNet
+from args import parse_args
+from resnet import ResNet
 
 
 def load_model(args, model_class, classes):
