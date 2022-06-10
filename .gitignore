@@ -1,6 +1,6 @@
 build
+condor_logs
 dist
 lightning_logs
-out
 *egg-info
 __pycache__
