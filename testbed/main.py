@@ -29,7 +29,7 @@ def load_model(args, model_class, classes):
 
     return model
 
-def load_trainer(args):
+def load_trainer(args, addtl_callbacks=None):
     checkpointer = ModelCheckpoint(
         filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
         monitor="val_loss",
@@ -40,6 +40,8 @@ def load_trainer(args):
     args.strategy = "ddp" if args.gpus > 1 else None
 
     callbacks = [checkpointer, progress_bar]
+    if type(addtl_callbacks) == list:
+        callbacks.extend(addtl_callbacks)
     trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
     return trainer
@@ -69,11 +71,11 @@ def load_cifar10(args):
 
     return dm
 
-def main(args, model_class):
+def main(args, model_class, callbacks=None):
     seed_everything(seed=42, workers=True)
 
     model = load_model(args, model_class, 10)
-    trainer = load_trainer(args)
+    trainer = load_trainer(args, addtl_callbacks=callbacks)
     dm = load_cifar10(args)
         
     trainer.fit(model, datamodule=dm)
@@ -81,4 +83,4 @@ def main(args, model_class):
 
 if __name__ == "__main__":
     args = parse_args()
-    main(args, model_class=ResNet)
+    main(args, ResNet)
