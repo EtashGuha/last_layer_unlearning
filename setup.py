@@ -1,13 +1,14 @@
 from setuptools import find_packages, setup
 
 with open("requirements.txt") as f:
-    required = f.read().splitlines()
+    lines = f.read()
+    lines = lines.replace("git+https://github.com/noahgolmant/pytorch-hessian-eigenthings.git@master#egg=hessian-eigenthings\n", "")
+    required = lines.splitlines()
+    required.append("hessian-eigenthings @ git+https://github.com/noahgolmant/pytorch-hessian-eigenthings.git@master#egg=hessian-eigenthings")
 
 setup(
     name="testbed",
     install_requires=required,
-    #package_dir={"": "src"},
-    #packages=find_packages("src"),
     packages=["testbed"],
     version="1.0",
 )
