@@ -1,15 +1,14 @@
-batch_size: 128
-data_dir: "data"
-dropout_probability: 0
+batch_size: 256
+data_dir: data
+dropout_probability: 0.5
 gpus: 1
-lr: 2e-3
+lr: 0.02
 lr_drop: 0.1
-lr_steps: [55, 70, 85]
-max_epochs: 100
+lr_steps: [30, 40, 45]
+max_epochs: 50
 momentum: 0.9
-optimizer: "sgd"
-out_dir: "out"
-refresh_rate: 1
+optimizer: sgd
+refresh_rate: 50
 resnet_version: 50
 resume_training: False
 resume_weights: False

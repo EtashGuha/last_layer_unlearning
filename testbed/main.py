@@ -1,5 +1,8 @@
 import torch
+from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
 
+from pl_bolts.datamodules import CIFAR10DataModule
+from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
@@ -41,17 +44,38 @@ def load_trainer(args):
 
     return trainer
 
-def main(args, model_class):
-    seed_everything(seed=42, workers=True)
+def load_cifar10(args):
+    train_transforms = Compose(
+        [
+            RandomCrop(32, padding=4),
+            RandomHorizontalFlip(),
+            ToTensor(),
+            cifar10_normalization(),
+        ]
+    )
 
-    model = load_model(args, model_class, 10)
-    trainer = load_trainer(args)
+    test_transforms = Compose(
+        [
+            ToTensor(),
+            cifar10_normalization(),
+        ]
+    )
+
     dm = CIFAR10DataModule(
         batch_size=args.batch_size,
         data_dir=args.data_dir,
         num_workers=args.workers,
     )
-    
+
+    return dm
+
+def main(args, model_class):
+    seed_everything(seed=42, workers=True)
+
+    model = load_model(args, model_class, 10)
+    trainer = load_trainer(args)
+    dm = load_cifar10(args)
+        
     trainer.fit(model, datamodule=dm)
        
 

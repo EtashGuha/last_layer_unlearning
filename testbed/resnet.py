@@ -30,6 +30,16 @@ class ResNet(pl.LightningModule):
         self.model = resnets[args.resnet_version](pretrained=True)
         self.optimizer = optimizers[args.optimizer]
 
+        self.model.conv1 = nn.Conv2d(
+            3,
+            64,
+            kernel_size=(3, 3),
+            stride=(1, 1),
+            padding=(1, 1),
+            bias=False,
+        )
+        self.model.maxpool = nn.Identity()
+
         self.model.fc = nn.Sequential(
             nn.Dropout(p=args.dropout_probability),
             nn.Linear(self.model.fc.in_features, classes),
@@ -86,9 +96,9 @@ class ResNet(pl.LightningModule):
         result = self.step(batch, idx)
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
-        self.log("train_loss", result["loss"], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("train_acc1", acc1, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("train_acc5", acc5, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        #self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return result["loss"]
 

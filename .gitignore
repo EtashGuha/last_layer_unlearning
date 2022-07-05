@@ -1,5 +1,6 @@
 build
 condor_logs
+data
 dist
 lightning_logs
 *egg-info
