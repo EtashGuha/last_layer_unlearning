@@ -14,11 +14,13 @@ class ResNetExp(ResNet):
         super().__init__(args, classes)
 
     def validation_epoch_end(self, validation_step_outputs):
-        print(validation_step_outputs)
-        names = list(n for n, _ in self.model.named_parameters())
+        imgs = torch.stack([result["imgs"] for result in validation_step_outputs])
+        targets = torch.stack([result["targets"] for result in validation_step_outputs])
+        batch = (images, targets)
 
+        names = list(n for n, _ in self.model.named_parameters())
         def loss(*params):
-            result: torch.Tensor = _stateless.functional_call(self.step, {n: p for n, p in zip(names, params)}, batch, idx)
+            result: torch.Tensor = _stateless.functional_call(self.step, {n: p for n, p in zip(names, params)}, batch, 0)
             return result["loss"]
 
         if self.current_epoch == 1:
