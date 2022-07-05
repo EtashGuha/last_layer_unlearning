@@ -17,7 +17,7 @@ class ResNetExp(ResNet):
     def validation_epoch_end(self, validation_step_outputs):
         imgs = torch.stack([result["imgs"] for result in validation_step_outputs])
         targets = torch.stack([result["targets"] for result in validation_step_outputs])
-        batch = (images, targets)
+        batch = (imgs, targets)
 
         names = list(n for n, _ in self.model.named_parameters())
         def loss(*params):
