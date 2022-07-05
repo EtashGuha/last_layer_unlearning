@@ -90,7 +90,7 @@ class ResNet(pl.LightningModule):
         probs = F.softmax(logits, dim=1).detach().cpu()
         targets = targets.cpu()
 
-        return {"loss": loss, "probs": probs, "targets": targets}
+        return {"loss": loss, "probs": probs, "imgs": imgs, "targets": targets}
 
     def training_step(self, batch, idx):
         result = self.step(batch, idx)
@@ -100,7 +100,7 @@ class ResNet(pl.LightningModule):
         self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        return result["loss"]
+        return result
 
     def validation_step(self, batch, idx):
         result = self.step(batch, idx)
@@ -110,7 +110,7 @@ class ResNet(pl.LightningModule):
         self.log("val_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("val_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        return result["loss"]
+        return result
 
     def test_step(self, batch, idx):
         result = self.step(batch, idx)
@@ -120,7 +120,7 @@ class ResNet(pl.LightningModule):
         self.log("test_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("test_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)
 
-        return result["loss"]
+        return result
 
     def predict_step(self, batch, batch_idx, dataloader_idx):
         return NotImplementedError

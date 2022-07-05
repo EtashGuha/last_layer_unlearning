@@ -13,7 +13,8 @@ class ResNetExp(ResNet):
     def __init__(self, args, classes):
         super().__init__(args, classes)
 
-    def validation_epoch_end(self, batch, idx):
+    def validation_epoch_end(self, validation_step_outputs):
+        print(validation_step_outputs)
         names = list(n for n, _ in self.model.named_parameters())
 
         def loss(*params):
