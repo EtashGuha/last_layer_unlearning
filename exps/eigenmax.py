@@ -1,5 +1,6 @@
 import os.path as osp
 
+import torch
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
 
