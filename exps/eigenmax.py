@@ -18,7 +18,7 @@ class ResNetExp(ResNet):
         names = list(n for n, _ in self.model.named_parameters())
 
         def loss(*params):
-            result: torch.Tensor = _stateless.functional_call(self.model.step, {n: p for n, p in zip(names, params)}, batch, idx)
+            result: torch.Tensor = _stateless.functional_call(self.step, {n: p for n, p in zip(names, params)}, batch, idx)
             return result["loss"]
 
         if self.current_epoch == 1:
