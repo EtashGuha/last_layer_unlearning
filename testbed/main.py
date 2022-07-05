@@ -11,7 +11,7 @@ from testbed.args import parse_args
 from testbed.resnet import ResNet
 
 
-def load_model(args, model_class, classes=None):
+def load_model(args, model_class, classes):
     model = model_class(args, classes=classes)
     
     if args.weights:

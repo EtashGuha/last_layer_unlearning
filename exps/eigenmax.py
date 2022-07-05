@@ -10,8 +10,8 @@ from testbed.main import main
 from testbed.resnet import ResNet
 
 class ResNetExp(ResNet):
-    def __init__(args):
-        super().__init__(args)
+    def __init__(self, args, classes):
+        super().__init__(args, classes)
 
     def validation_epoch_end(self, batch, idx):
         names = list(n for n, _ in self.model.named_parameters())
