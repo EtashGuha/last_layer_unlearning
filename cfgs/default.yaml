@@ -8,8 +8,8 @@ lr_steps: [30, 40, 45]
 max_epochs: 50
 momentum: 0.9
 optimizer: sgd
-refresh_rate: 18
-resnet_version: 50
+refresh_rate: 50
+resnet_version: 18
 resume_training: False
 resume_weights: False
 train_fc_only: False
