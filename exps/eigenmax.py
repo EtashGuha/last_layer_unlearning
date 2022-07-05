@@ -3,7 +3,7 @@ import os.path as osp
 from torch.autograd.functional import hessian
 from torch.nn.utils import _stateless
 
-from matplotlib.pyplot import plt
+import matplotlib.pyplot as plt
 
 from testbed.args import parse_args
 from testbed.main import main
