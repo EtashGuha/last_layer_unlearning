@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python exps/eigenmax.py -c cfgs/default.yaml
+python exps/hessian.py -c cfgs/simple.yaml
