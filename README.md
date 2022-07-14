@@ -3,8 +3,8 @@
 ### Setup
 ```
 conda update -n base -c defaults conda
-conda create -n testbed python==3.10
-conda activate testbed
+conda create -n groundzero python==3.10
+conda activate groundzero
 conda install pytorch torchvision cudatoolkit=11.3 -c pytorch
 python -m pip install -e .
 condor_submit run.cfg

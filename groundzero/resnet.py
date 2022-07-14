@@ -7,7 +7,7 @@ import torchvision.models as models
 
 import pytorch_lightning as pl
 
-from testbed.utils import compute_accuracy
+from groundzero.utils import compute_accuracy
 
 
 class ResNet(pl.LightningModule):

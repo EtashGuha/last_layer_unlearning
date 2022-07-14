@@ -7,8 +7,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
 
-from testbed.args import parse_args
-from testbed.resnet import ResNet
+from groundzero.args import parse_args
+from groundzero.resnet import ResNet
 
 
 def load_model(args, model_class, classes):

@@ -8,9 +8,9 @@ from hessian_eigenthings import compute_hessian_eigenthings
 import matplotlib.pyplot as plt
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
-from testbed.args import parse_args
-from testbed.main import main
-from testbed.resnet import ResNet
+from groundzero.args import parse_args
+from groundzero.main import main
+from groundzero.resnet import ResNet
 
 RHO = 0.05
 EIGENVALS = []
