@@ -24,6 +24,10 @@ class HessianResNet(ResNet):
     def __init__(self, args, classes):
         super().__init__(args, classes)
 
+    def validation_step(self, batch, idx):
+        torch.set_grad_enabled(True)
+        super().validation_step(batch, idx)
+
     def validation_epoch_end(self, validation_step_outputs):
         if self.train_acc1 >= TRAIN_ACC_STOP_THRESHOLD:
             # Computes maximum Hessian eigenvalue
@@ -32,27 +36,27 @@ class HessianResNet(ResNet):
             loader = self.trainer.val_dataloaders[0]
             eigenval = compute_hessian_eigenthings(self.model, loader, loss, 1)[0][0]
             EIGENVALS.append(eigenval)
-            torch.set_grad_enabled(False) 
             print(EIGENVALS)
 
             # Computes worst-case sharpness viz. SAM
-            params = deepcopy(self.model.parameters())
+            params = deepcopy(list(self.model.parameters()))
             for p in self.model.parameters():
-                epsilon = RHO * F.normalize(p.grad)
+                #print(p.grad)
+                epsilon = RHO * F.normalize(p.grad, dim=0)
                 p = p + epsilon
 
             losses = []
             sam_losses = []
             for j, step in enumerate(validation_step_outputs):
-                batch = (step["imgs"], step["targets"])
+                batch = (step["imgs"].cuda(), step["targets"].cuda())
                 losses.append(step["loss"])
                 sam_losses.append(self.step(batch, j)["loss"])
-            losses = torch.stack(losses)
-            sam_losses = torch.stack(sam_losses)
+            losses = torch.as_tensor(losses)
+            sam_losses = torch.as_tensor(sam_losses)
             sharpness = sam_losses.mean() - losses.mean()
             SHARPNESSES.append(sharpness)
-
-            self.model.parameters = params
+            self.model.parameters = (p for p in params)
+            print(SHARPNESSES)
 
 def experiment(args):
     args.max_epochs = 1000

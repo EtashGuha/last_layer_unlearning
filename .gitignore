@@ -1,7 +1,9 @@
 build
 condor_logs
+*.cfg
 data
 dist
+*.egg-info
 lightning_logs
-*egg-info
 __pycache__
+*.sh

@@ -89,6 +89,8 @@ class ResNet(pl.LightningModule):
         loss = F.cross_entropy(logits, targets)
 
         probs = F.softmax(logits, dim=1).detach().cpu()
+
+        imgs = imgs.cpu()
         targets = targets.cpu()
 
         return {"loss": loss, "probs": probs, "imgs": imgs, "targets": targets}
@@ -98,11 +100,14 @@ class ResNet(pl.LightningModule):
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
         #self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.train_acc1 = acc1
+        result["acc1"] = acc1
         self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return result
+
+    def training_epoch_end(self, training_step_outputs):
+        self.train_acc1 = torch.stack([result["acc1"] for result in training_step_outputs]).mean()
 
     def validation_step(self, batch, idx):
         result = self.step(batch, idx)
