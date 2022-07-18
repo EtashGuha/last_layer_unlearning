@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python exps/hessian.py -c cfgs/simple.yaml
+python exps/spectrum.py -c cfgs/mnist_simple.yaml
