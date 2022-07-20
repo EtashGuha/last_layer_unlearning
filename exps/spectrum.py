@@ -137,7 +137,7 @@ def experiment(args):
         spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
         frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
         plt.plot(x, spectral, color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
-        plt.plot(x, norms[(width, depth)][1], color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
+        plt.plot(x, frobenius, color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
     legend1 = plt.legend(handles=[dashed_line, solid_line])
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
     plt.gca().add_artist(legend1)
