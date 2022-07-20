@@ -86,7 +86,7 @@ def experiment(args):
     global ACCS, NORMS, SPECTRA, TRAIN_EIGENMAX, VAL_EIGENMAX
 
     colors = ["red", "blue", "green", "orange", "brown", "purple"]
-    params = [(64, 2), (128, 2), (256, 2), (64, 3), (128, 3), (256, 3)]
+    params = [(512, 2), (1024, 2), (512, 3), (1024, 3), (512, 4), (1024, 4)]
     legend = [f"(w: {p[0]}, d: {p[1]})" for p in params]
 
     accs = {}
@@ -132,7 +132,7 @@ def experiment(args):
     plt.xlabel("Model")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.ylim([0.9, 0.94])
+    plt.ylim([0.9, 1.0])
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
@@ -189,9 +189,10 @@ def experiment(args):
         plt.savefig(osp.join(args.out_dir, f"norms{n}.png"))
         plt.clf()
 
-    plot_weight_norms(1, 256, 2)
-    plot_weight_norms(2, 256, 3)
-    plot_weight_norms(3, 64, 3)
+    plot_weight_norms(1, 512, 2)
+    plot_weight_norms(2, 512, 3)
+    plot_weight_norms(3, 512, 4)
+    plot_weight_norms(4, 1024, 4)
 
     def plot_spectra(n, width, depth):
         if depth == 2:
@@ -218,9 +219,10 @@ def experiment(args):
         plt.savefig(osp.join(args.out_dir, f"spectra{n}.png"))
         plt.clf()
 
-    plot_spectra(1, 256, 2)
-    plot_spectra(2, 256, 3)
-    plot_spectra(3, 64, 3)
+    plot_spectra(1, 512, 2)
+    plot_spectra(2, 512, 3)
+    plot_spectra(3, 512, 4)
+    plot_spectra(4, 1024, 4)
 
     def plot_eigenmax(n, width, depth):
         dashed_line = Line2D([], [], color="black", label="max train (xTATAx / ||x||^2)^1/2", linestyle="dashed")
@@ -256,9 +258,10 @@ def experiment(args):
         plt.savefig(osp.join(args.out_dir, f"eigenmax{n}.png"))
         plt.clf()
 
-    plot_eigenmax(1, 256, 2)
-    plot_eigenmax(2, 256, 3)
-    plot_eigenmax(3, 64, 3)
+    plot_eigenmax(1, 512, 2)
+    plot_eigenmax(2, 512, 3)
+    plot_eigenmax(3, 512, 4)
+    plot_eigenmax(4, 1024, 4)
 
 
 if __name__ == "__main__":
