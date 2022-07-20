@@ -34,7 +34,7 @@ def load_model(args, model_class, classes):
             else:
                 print(f"Loading ResNet{args.resnet_version} with no pretraining.")
         elif args.arch == "mlp":
-            print("Loading MLP with {args.mlp_num_layers} layers.")
+            print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
 
     return model
 

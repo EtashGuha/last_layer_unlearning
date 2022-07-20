@@ -4,8 +4,8 @@ import os.path as osp
 import torch
 
 import matplotlib.pyplot as plt
-from plt.lines import Line2D
-from plt.patches import Patch
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from groundzero.args import parse_args
@@ -21,8 +21,9 @@ VAL_EIGENMAX = []
 def np(x):
     return x.cpu().detach().numpy()
 
-def singular(x, A):
-    return torch.matmul(x, torch.matmul(torch.matmul(A, A), x)) / (torch.linalg.vector_norm(x, dim=1) ** 2)
+def singular(x, A, batch_size):
+    # return batched x^T (A^T A) x / ||x||^2
+    return torch.sum(x * torch.matmul(torch.matmul(A.T, A), x.T).T, dim=1) / (torch.linalg.vector_norm(x, dim=1) ** 2)
 
 class SpectrumMLP(MLP):
     def __init__(self, args, classes):
@@ -34,14 +35,14 @@ class SpectrumMLP(MLP):
     def forward(self, inputs):
         x = inputs.reshape(inputs.shape[0], -1)
 
-        for i, layer in enumerate(self.layers):
+        for i, layer in enumerate(self.model):
             with torch.no_grad():
                 if i in self.fc_layers:
-                    j = i / 3
-                    v = singular(x, layer.weight)
+                    j = i // 3
+                    v = singular(x, layer.weight, self.hparams.batch_size)
                     for k in v:
-                        if k.item() > self.eigenmax(j):
-                            self.eigenmax(j) = k.item()
+                        if k.item() > self.eigenmax[j]:
+                            self.eigenmax[j] = k.item()
             x = layer(x)
 
         return x
@@ -50,19 +51,19 @@ class SpectrumMLP(MLP):
         super().train_epoch_end(train_step_outputs)
 
         TRAIN_EIGENMAX.append(self.eigenmax)
-        self.eigenmax = (0, 0, 0)
+        self.eigenmax = [0] * self.hparams.mlp_num_layers
 
     def validation_epoch_end(self, validation_step_outputs):
         super().validation_epoch_end(validation_step_outputs)
 
-        weights = [self.model.layers[i].weight for i in self.fc_layers]
+        weights = [self.model[i].weight for i in self.fc_layers]
 
-        ACCS.append([self.train_acc1.item(), self.val_acc1.item()])
-        NORMS.append([np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro")) for w in weights])
+        ACCS.append([self.train_acc1, self.val_acc1])
+        NORMS.append([(np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro"))) for w in weights])
         SPECTRA.append([np(torch.linalg.svdvals(w)) for w in weights])
 
         VAL_EIGENMAX.append(self.eigenmax)
-        self.eigenmax = (0, 0, 0)
+        self.eigenmax = [0] * self.hparams.mlp_num_layers
 
 def experiment(args):
     """
@@ -76,8 +77,10 @@ def experiment(args):
     ]
     """
 
+    global ACCS, NORMS, SPECTRA, TRAIN_EIGENMAX, VAL_EIGENMAX
+
     colors = ["red", "blue", "green", "orange", "brown", "purple"]
-    params = [(64, 2), (128, 2), (256, 2), (64, 3), (128, 3), (256, 3)]:
+    params = [(64, 2), (128, 2), (256, 2), (64, 3), (128, 3), (256, 3)]
     legend = [f"(w: {p[0]}, d: {p[1]})" for p in params]
 
     accs = {}
@@ -103,7 +106,7 @@ def experiment(args):
         TRAIN_EIGENMAX = []
         VAL_EIGENMAX = []
 
-    x = range(args.max_epochs + 1)
+    x = list(range(args.max_epochs + 1))
     dashed_line = Line2D([], [], color="black", label="Train", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Test", linestyle="solid")
     red_patch = Patch(color="red", label=legend[0])
@@ -114,8 +117,10 @@ def experiment(args):
     purple_patch = Patch(color="purple", label=legend[5])
 
     for c, (width, depth) in zip(colors, params):
-        plt.plot(x, accs[(width, depth)][0], color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
-        plt.plot(x, accs[(width, depth)][1], color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
+        train = [epoch[0] for epoch in accs[(width, depth)]]
+        test = [epoch[1] for epoch in accs[(width, depth)]]
+        plt.plot(x, train, color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
+        plt.plot(x, test, color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
     legend1 = plt.legend(handles=[dashed_line, solid_line])
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
     plt.gca().add_artist(legend1)
@@ -207,7 +212,7 @@ def experiment(args):
 
     def plot_eigenmax(n, width, depth):
         dashed_line = Line2D([], [], color="black", label="max train xAx / x^2", linestyle="dashed")
-        dotted_line = Line2D([], [], color="black", label="max val xAx / x^2", linestyle="dotted")
+        dotted_line = Line2D([], [], color="black", label="max test xAx / x^2", linestyle="dotted")
         solid_line = Line2D([], [], color="black", label="Top SV", linestyle="solid")
 
         if depth == 2:
@@ -217,11 +222,11 @@ def experiment(args):
 
         for c, w in zip(colors, list(range(depth))):
             train = [epoch[w] for epoch in train_eigenmax[(width, depth)]]
-            val = [epoch[w] for epoch in val_eigenmax[(width, depth)]]
+            test = [epoch[w] for epoch in val_eigenmax[(width, depth)]]
             spectral = [epoch[w][0] for epoch in norms[(width, depth)]]
 
             plt.plot(x, train, color=c, linestyle="dashed")
-            plt.plot(x, val, color=c, linestyle="dotted")
+            plt.plot(x, test, color=c, linestyle="dotted")
             plt.plot(x, spectral, color=c, linestyle="solid")
 
         red_patch = Patch(color="red", label="Hidden 1")
