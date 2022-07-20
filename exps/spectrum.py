@@ -21,7 +21,7 @@ VAL_EIGENMAX = []
 def np(x):
     return x.cpu().detach().numpy()
 
-def singular(x, A, batch_size):
+def singular(x, A):
     # return batched x^T (A^T A) x / ||x||^2
     return torch.sum(x * torch.matmul(torch.matmul(A.T, A), x.T).T, dim=1) / (torch.linalg.vector_norm(x, dim=1) ** 2)
 
@@ -29,7 +29,8 @@ class SpectrumMLP(MLP):
     def __init__(self, args, classes):
         super().__init__(args, classes)
 
-        self.eigenmax = [0] * args.mlp_num_layers
+        self.train_eigenmax = [0] * args.mlp_num_layers
+        self.val_eigenmax = [0] * args.mlp_num_layers
         self.fc_layers = [3 * i for i in range(args.mlp_num_layers)]
 
     def forward(self, inputs):
@@ -39,10 +40,14 @@ class SpectrumMLP(MLP):
             with torch.no_grad():
                 if i in self.fc_layers:
                     j = i // 3
-                    v = singular(x, layer.weight, self.hparams.batch_size)
+                    v = singular(x, layer.weight)
                     for k in v:
-                        if k.item() > self.eigenmax[j]:
-                            self.eigenmax[j] = k.item()
+                        if self.training:
+                            if k.item() > self.train_eigenmax[j]:
+                                self.train_eigenmax[j] = k.item()
+                        else:
+                            if k.item() > self.val_eigenmax[j]:
+                                self.val_eigenmax[j] = k.item()
             x = layer(x)
 
         return x
@@ -50,8 +55,8 @@ class SpectrumMLP(MLP):
     def training_epoch_end(self, training_step_outputs):
         super().training_epoch_end(training_step_outputs)
 
-        TRAIN_EIGENMAX.append(self.eigenmax)
-        self.eigenmax = [0] * self.hparams.mlp_num_layers
+        TRAIN_EIGENMAX.append(self.train_eigenmax)
+        self.train_eigenmax = [0] * self.hparams.mlp_num_layers
 
     def validation_epoch_end(self, validation_step_outputs):
         super().validation_epoch_end(validation_step_outputs)
@@ -62,8 +67,8 @@ class SpectrumMLP(MLP):
         NORMS.append([(np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro"))) for w in weights])
         SPECTRA.append([np(torch.linalg.svdvals(w)) for w in weights])
 
-        VAL_EIGENMAX.append(self.eigenmax)
-        self.eigenmax = [0] * self.hparams.mlp_num_layers
+        VAL_EIGENMAX.append(self.val_eigenmax)
+        self.val_eigenmax = [0] * self.hparams.mlp_num_layers
 
 def experiment(args):
     """
@@ -225,7 +230,7 @@ def experiment(args):
             test = [epoch[w] for epoch in val_eigenmax[(width, depth)]]
             spectral = [epoch[w][0] for epoch in norms[(width, depth)]]
 
-            plt.plot(x, train, color=c, linestyle="dashed")
+            plt.plot(x[1:], train, color=c, linestyle="dashed")
             plt.plot(x, test, color=c, linestyle="dotted")
             plt.plot(x, spectral, color=c, linestyle="solid")
 
