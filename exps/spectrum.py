@@ -132,7 +132,7 @@ def experiment(args):
     plt.xlabel("Model")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.ylim([0.9, 1.0])
+    plt.ylim([0.95, 1.0])
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
