@@ -128,7 +128,7 @@ def experiment(args):
     plt.ylabel("Accuracy")
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
-    plt.clear()
+    plt.clf()
 
     dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Frobenius", linestyle="solid")
@@ -145,7 +145,7 @@ def experiment(args):
     plt.ylabel("Product of Norms")
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "prods.png"))
-    plt.clear()
+    plt.clf()
 
     def plot_weight_norms(n, width, depth):
         dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
@@ -175,7 +175,7 @@ def experiment(args):
         plt.ylabel("Norm")
         plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02, WD 0, 20 epochs")
         plt.savefig(osp.join(args.out_dir, f"norms{n}.png"))
-        plt.clear()
+        plt.clf()
 
     plot_weight_norms(1, 256, 2)
     plot_weight_norms(2, 256, 3)
@@ -204,7 +204,7 @@ def experiment(args):
         plt.ylabel("Singular Values")
         plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02, WD 0, 20 epochs")
         plt.savefig(osp.join(args.out_dir, f"spectra{n}.png"))
-        plt.clear()
+        plt.clf()
 
     plot_spectra(1, 256, 2)
     plot_spectra(2, 256, 3)
@@ -240,7 +240,7 @@ def experiment(args):
         plt.ylabel("Singular Values")
         plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02, WD 0, 20 epochs")
         plt.savefig(osp.join(args.out_dir, f"eigenmax{n}.png"))
-        plt.clear()
+        plt.clf()
 
     plot_eigenmax(1, 256, 2)
     plot_eigenmax(2, 256, 3)
