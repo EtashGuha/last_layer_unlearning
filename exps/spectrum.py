@@ -123,7 +123,7 @@ def experiment(args):
 
     x = [f"(w: {width}, d: {depth})" for width, depth in params]
     train_accs = [accs[(width, depth)][-1][0] for width, depth in params]
-    val_accs = [accs[(width, depth)][-1][0] for width, depth in params]
+    val_accs = [accs[(width, depth)][-1][1] for width, depth in params]
 
     x_axis = numpy.arange(len(x))
     plt.bar(x_axis - 0.2, train_accs, 0.4, label="Train")
@@ -132,7 +132,7 @@ def experiment(args):
     plt.xlabel("Model")
     plt.ylabel("Accuracy")
     plt.legend()
-    plt.ylim([0.9, 1.0])
+    plt.ylim([0.9, 0.94])
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
@@ -141,18 +141,22 @@ def experiment(args):
     dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Frobenius", linestyle="solid")
     
-    for c, (width, depth) in zip(colors, params):
-        spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
-        frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
-        plt.plot(x, spectral, color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
-        plt.plot(x, frobenius, color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
-    legend1 = plt.legend(handles=[dashed_line, solid_line], loc="upper center")
+    spectral = [numpy.array([epoch[w][0] for w in range(depth)]).prod() for epoch in norms[(width, depth)]]
+    plt.plot(x, spectral, label=f"(w: {width}, d: {depth})")
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
-    plt.gca().add_artist(legend1)
     plt.xlabel("Epoch")
-    plt.ylabel("Product of Norms")
+    plt.ylabel("Product of Spectral Norms")
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
-    plt.savefig(osp.join(args.out_dir, "prods.png"))
+    plt.savefig(osp.join(args.out_dir, "prods1.png"))
+    plt.clf()
+
+    frobenius = [numpy.array([epoch[w][1] for w in range(depth)]).prod() for epoch in norms[(width, depth)]]
+    plt.plot(x, frobenius, label=f"(w: {width}, d: {depth})")
+    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
+    plt.xlabel("Epoch")
+    plt.ylabel("Product of Frobenius Norms")
+    plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
+    plt.savefig(osp.join(args.out_dir, "prods2.png"))
     plt.clf()
 
     def plot_weight_norms(n, width, depth):
