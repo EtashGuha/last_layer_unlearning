@@ -6,6 +6,7 @@ import torch
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+import numpy
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from groundzero.args import parse_args
@@ -22,8 +23,8 @@ def np(x):
     return x.cpu().detach().numpy()
 
 def singular(x, A):
-    # return batched x^T (A^T A) x / ||x||^2
-    return torch.sum(x * torch.matmul(torch.matmul(A.T, A), x.T).T, dim=1) / (torch.linalg.vector_norm(x, dim=1) ** 2)
+    # return batched (x^T (A^T A) x / ||x||^2)^(1/2)
+    return torch.sqrt(torch.sum(x * torch.matmul(torch.matmul(A.T, A), x.T).T, dim=1) / (torch.linalg.vector_norm(x, dim=1) ** 2))
 
 class SpectrumMLP(MLP):
     def __init__(self, args, classes):
@@ -111,7 +112,6 @@ def experiment(args):
         TRAIN_EIGENMAX = []
         VAL_EIGENMAX = []
 
-    x = list(range(args.max_epochs + 1))
     dashed_line = Line2D([], [], color="black", label="Train", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Test", linestyle="solid")
     red_patch = Patch(color="red", label=legend[0])
@@ -121,29 +121,32 @@ def experiment(args):
     brown_patch = Patch(color="brown", label=legend[4])
     purple_patch = Patch(color="purple", label=legend[5])
 
-    for c, (width, depth) in zip(colors, params):
-        train = [epoch[0] for epoch in accs[(width, depth)]]
-        test = [epoch[1] for epoch in accs[(width, depth)]]
-        plt.plot(x, train, color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
-        plt.plot(x, test, color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
-    legend1 = plt.legend(handles=[dashed_line, solid_line])
-    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
-    plt.gca().add_artist(legend1)
-    plt.xlabel("Epoch")
+    x = [f"(w: {width}, d: {depth})" for width, depth in params]
+    train_accs = [accs[(width, depth)][-1][0] for width, depth in params]
+    val_accs = [accs[(width, depth)][-1][0] for width, depth in params]
+
+    x_axis = numpy.arange(len(x))
+    plt.bar(x_axis - 0.2, train_accs, 0.4, label="Train")
+    plt.bar(x_axis + 0.2, val_accs, 0.4, label="Test")
+    plt.xticks(x_axis, x, fontsize=8)
+    plt.xlabel("Model")
     plt.ylabel("Accuracy")
+    plt.legend()
+    plt.ylim([0.9, 1.0])
     plt.title("MNIST, SGD 0.02, WD 0, 20 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
-
+    
+    x = list(range(args.max_epochs + 1))
     dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Frobenius", linestyle="solid")
-
+    
     for c, (width, depth) in zip(colors, params):
         spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
         frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
         plt.plot(x, spectral, color=c, label=f"(w: {width}, d: {depth})", linestyle="dashed")
         plt.plot(x, frobenius, color=c, label=f"(w: {width}, d: {depth})", linestyle="solid")
-    legend1 = plt.legend(handles=[dashed_line, solid_line])
+    legend1 = plt.legend(handles=[dashed_line, solid_line], loc="upper center")
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
     plt.gca().add_artist(legend1)
     plt.xlabel("Epoch")
@@ -169,12 +172,12 @@ def experiment(args):
 
         red_patch = Patch(color="red", label="Hidden 1")
         green_patch = Patch(color="green", label="Output")
-        legend1 = plt.legend(handles=[dashed_line, solid_line])
+        legend1 = plt.legend(handles=[dashed_line, solid_line], loc="center right")
         if depth == 2:
             plt.legend(handles=[red_patch, green_patch])
         elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
-            plt.legend(handles=[red_patch, blue_patch, green_patch])
+            plt.legend(handles=[red_patch, blue_patch, green_patch], loc="center right")
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Norm")
@@ -216,8 +219,8 @@ def experiment(args):
     plot_spectra(3, 64, 3)
 
     def plot_eigenmax(n, width, depth):
-        dashed_line = Line2D([], [], color="black", label="max train xAx / x^2", linestyle="dashed")
-        dotted_line = Line2D([], [], color="black", label="max test xAx / x^2", linestyle="dotted")
+        dashed_line = Line2D([], [], color="black", label="max train (xTATAx / ||x||^2)^1/2", linestyle="dashed")
+        dotted_line = Line2D([], [], color="black", label="max test (xTATAx / ||x||^2)^1/2", linestyle="dotted")
         solid_line = Line2D([], [], color="black", label="Top SV", linestyle="solid")
 
         if depth == 2:
@@ -238,10 +241,10 @@ def experiment(args):
         green_patch = Patch(color="green", label="Output")
         legend1 = plt.legend(handles=[dashed_line, dotted_line, solid_line])
         if depth == 2:
-            plt.legend(handles=[red_patch, green_patch])
+            plt.legend(handles=[red_patch, green_patch], loc="upper left")
         elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
-            plt.legend(handles=[red_patch, blue_patch, green_patch])
+            plt.legend(handles=[red_patch, blue_patch, green_patch], loc="upper left")
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
