@@ -65,7 +65,7 @@ class SpectrumMLP(MLP):
 
         ACCS.append([self.train_acc1, self.val_acc1])
         NORMS.append([(np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro"))) for w in weights])
-        SPECTRA.append([np(torch.linalg.svdvals(w)) for w in weights])
+        SPECTRA.append([np(torch.linalg.svdvals(w))[:5] for w in weights])
 
         VAL_EIGENMAX.append(self.val_eigenmax)
         self.val_eigenmax = [0] * self.hparams.mlp_num_layers
@@ -236,11 +236,13 @@ def experiment(args):
 
         red_patch = Patch(color="red", label="Hidden 1")
         green_patch = Patch(color="green", label="Output")
+        legend1 = plt.legend(handles=[dashed_line, dotted_line, solid_line])
         if depth == 2:
             plt.legend(handles=[red_patch, green_patch])
         elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
             plt.legend(handles=[red_patch, blue_patch, green_patch])
+        plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
         plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02, WD 0, 20 epochs")
