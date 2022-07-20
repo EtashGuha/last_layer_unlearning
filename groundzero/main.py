@@ -68,6 +68,7 @@ def load_mnist(args):
     dm = MNISTDataModule(
         batch_size=args.batch_size,
         data_dir=args.data_dir,
+        normalize=True,
         num_workers=args.workers,
     )
 
