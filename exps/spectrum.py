@@ -165,9 +165,9 @@ def experiment(args):
         red_patch = Patch(color="red", label="Hidden 1")
         green_patch = Patch(color="green", label="Output")
         legend1 = plt.legend(handles=[dashed_line, solid_line])
-        if d == 2:
+        if depth == 2:
             plt.legend(handles=[red_patch, green_patch])
-        elif d == 3:
+        elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
             plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.gca().add_artist(legend1)
@@ -195,9 +195,9 @@ def experiment(args):
 
         red_patch = Patch(color="red", label="Hidden 1")
         green_patch = Patch(color="green", label="Output")
-        if d == 2:
+        if depth == 2:
             plt.legend(handles=[red_patch, green_patch])
-        elif d == 3:
+        elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
             plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.xlabel("Epoch")
@@ -231,9 +231,9 @@ def experiment(args):
 
         red_patch = Patch(color="red", label="Hidden 1")
         green_patch = Patch(color="green", label="Output")
-        if d == 2:
+        if depth == 2:
             plt.legend(handles=[red_patch, green_patch])
-        elif d == 3:
+        elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
             plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.xlabel("Epoch")
