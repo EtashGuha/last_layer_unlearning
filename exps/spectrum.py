@@ -47,8 +47,8 @@ class SpectrumMLP(MLP):
 
         return x
     
-    def train_epoch_end(self, train_step_outputs):
-        super().train_epoch_end(train_step_outputs)
+    def training_epoch_end(self, training_step_outputs):
+        super().training_epoch_end(training_step_outputs)
 
         TRAIN_EIGENMAX.append(self.eigenmax)
         self.eigenmax = [0] * self.hparams.mlp_num_layers
