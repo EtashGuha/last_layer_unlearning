@@ -141,7 +141,7 @@ def experiment(args):
     dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Frobenius", linestyle="solid")
     
-    spectral = [numpy.array([epoch[w][0] for w in range(depth)]).prod() for epoch in norms[(width, depth)]]
+    spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
     plt.plot(x, spectral, label=f"(w: {width}, d: {depth})")
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
     plt.xlabel("Epoch")
@@ -150,7 +150,7 @@ def experiment(args):
     plt.savefig(osp.join(args.out_dir, "prods1.png"))
     plt.clf()
 
-    frobenius = [numpy.array([epoch[w][1] for w in range(depth)]).prod() for epoch in norms[(width, depth)]]
+    frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
     plt.plot(x, frobenius, label=f"(w: {width}, d: {depth})")
     plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
     plt.xlabel("Epoch")
