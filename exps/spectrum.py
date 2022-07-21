@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 import numpy
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from groundzero.args import parse_args
 from groundzero.main import main
@@ -66,27 +65,16 @@ class SpectrumMLP(MLP):
 
         ACCS.append([self.train_acc1, self.val_acc1])
         NORMS.append([(np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro"))) for w in weights])
-        SPECTRA.append([np(torch.linalg.svdvals(w))[:5] for w in weights])
+        SPECTRA.append([np(torch.linalg.svdvals(w))[:3] for w in weights])
 
         VAL_EIGENMAX.append(self.val_eigenmax)
         self.val_eigenmax = [0] * self.hparams.mlp_num_layers
 
 def experiment(args):
-    """
-    callbacks = [
-        EarlyStopping(
-            monitor="train_acc1",
-            mode="max",
-            stopping_threshold=0.99,
-            check_on_train_epoch_end=True,
-        ),
-    ]
-    """
-
     global ACCS, NORMS, SPECTRA, TRAIN_EIGENMAX, VAL_EIGENMAX
 
-    colors = ["red", "blue", "green", "orange", "brown", "purple"]
-    params = [(256, 2), (1024, 2), (256, 3), (1024, 3), (256, 4), (1024, 4)]
+    colors = ["red", "blue", "green", "orange"]
+    params = [(256, 2), (512, 2), (256, 3), (512, 3)]
     legend = [f"(w: {p[0]}, d: {p[1]})" for p in params]
 
     accs = {}
@@ -118,8 +106,6 @@ def experiment(args):
     blue_patch = Patch(color="blue", label=legend[1])
     green_patch = Patch(color="green", label=legend[2])
     orange_patch = Patch(color="orange", label=legend[3])
-    brown_patch = Patch(color="brown", label=legend[4])
-    purple_patch = Patch(color="purple", label=legend[5])
 
     x = [f"(w: {width}, d: {depth})" for width, depth in params]
     train_accs = [accs[(width, depth)][-1][0] for width, depth in params]
@@ -128,12 +114,12 @@ def experiment(args):
     x_axis = numpy.arange(len(x))
     plt.bar(x_axis - 0.2, train_accs, 0.4, label="Train")
     plt.bar(x_axis + 0.2, val_accs, 0.4, label="Test")
-    plt.xticks(x_axis, x, fontsize=8)
+    plt.xticks(x_axis, x, fontsize=10)
     plt.xlabel("Model")
     plt.ylabel("Accuracy")
     plt.legend()
     plt.ylim([0.95, 1.0])
-    plt.title("MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
     
@@ -143,19 +129,19 @@ def experiment(args):
     
     spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
     plt.plot(x, spectral, label=f"(w: {width}, d: {depth})")
-    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
+    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch])
     plt.xlabel("Epoch")
     plt.ylabel("Product of Spectral Norms")
-    plt.title("MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
     plt.savefig(osp.join(args.out_dir, "prods1.png"))
     plt.clf()
 
     frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
     plt.plot(x, frobenius, label=f"(w: {width}, d: {depth})")
-    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch, brown_patch, purple_patch])
+    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch])
     plt.xlabel("Epoch")
     plt.ylabel("Product of Frobenius Norms")
-    plt.title("MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
     plt.savefig(osp.join(args.out_dir, "prods2.png"))
     plt.clf()
 
@@ -185,14 +171,14 @@ def experiment(args):
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Norm")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
         plt.savefig(osp.join(args.out_dir, f"norms{n}.png"))
         plt.clf()
 
     plot_weight_norms(1, 256, 2)
-    plot_weight_norms(2, 256, 3)
-    plot_weight_norms(3, 256, 4)
-    plot_weight_norms(4, 1024, 4)
+    plot_weight_norms(2, 512, 2)
+    plot_weight_norms(3, 256, 3)
+    plot_weight_norms(4, 512, 3)
 
     def plot_spectra(n, width, depth):
         if depth == 2:
@@ -215,14 +201,14 @@ def experiment(args):
             plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
         plt.savefig(osp.join(args.out_dir, f"spectra{n}.png"))
         plt.clf()
 
     plot_spectra(1, 256, 2)
-    plot_spectra(2, 256, 3)
-    plot_spectra(3, 256, 4)
-    plot_spectra(4, 1024, 4)
+    plot_spectra(2, 512, 2)
+    plot_spectra(3, 256, 3)
+    plot_spectra(4, 512, 3)
 
     def plot_eigenmax(n, width, depth):
         dashed_line = Line2D([], [], color="black", label="max train (xTATAx / ||x||^2)^1/2", linestyle="dashed")
@@ -254,14 +240,14 @@ def experiment(args):
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.02/0.002, WD 0, B 256, 80 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
         plt.savefig(osp.join(args.out_dir, f"eigenmax{n}.png"))
         plt.clf()
 
     plot_eigenmax(1, 256, 2)
-    plot_eigenmax(2, 256, 3)
-    plot_eigenmax(3, 256, 4)
-    plot_eigenmax(4, 1024, 4)
+    plot_eigenmax(2, 512, 2)
+    plot_eigenmax(3, 256, 3)
+    plot_eigenmax(4, 512, 3)
 
 
 if __name__ == "__main__":
