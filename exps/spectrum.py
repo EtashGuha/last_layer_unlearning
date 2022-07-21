@@ -166,10 +166,10 @@ def experiment(args):
         green_patch = Patch(color="green", label="Output")
         legend1 = plt.legend(handles=[dashed_line, solid_line], loc="center right")
         if depth == 2:
-            plt.legend(handles=[red_patch, green_patch])
+            plt.legend(handles=[red_patch, green_patch], loc="upper left")
         elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
-            plt.legend(handles=[red_patch, blue_patch, green_patch])
+            plt.legend(handles=[red_patch, blue_patch, green_patch], loc="upper left")
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Norm")
