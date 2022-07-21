@@ -119,7 +119,7 @@ def experiment(args):
     plt.ylabel("Accuracy")
     plt.legend()
     plt.ylim([0.95, 1.0])
-    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+    plt.title("MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
     plt.savefig(osp.join(args.out_dir, "acc.png"))
     plt.clf()
     
@@ -133,7 +133,7 @@ def experiment(args):
     plt.legend()
     plt.xlabel("Epoch")
     plt.ylabel("Product of Spectral Norms")
-    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+    plt.title("MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
     plt.savefig(osp.join(args.out_dir, "prods1.png"))
     plt.clf()
 
@@ -143,7 +143,7 @@ def experiment(args):
     plt.legend()
     plt.xlabel("Epoch")
     plt.ylabel("Product of Frobenius Norms")
-    plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+    plt.title("MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
     plt.savefig(osp.join(args.out_dir, "prods2.png"))
     plt.clf()
 
@@ -173,7 +173,7 @@ def experiment(args):
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Norm")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
         plt.savefig(osp.join(args.out_dir, f"norms{n}.png"))
         plt.clf()
 
@@ -203,7 +203,7 @@ def experiment(args):
             plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
         plt.savefig(osp.join(args.out_dir, f"spectra{n}.png"))
         plt.clf()
 
@@ -242,7 +242,7 @@ def experiment(args):
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Singular Values")
-        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
+        plt.title(f"(w: {width}, d: {depth}), MNIST, SGD 0.05, WD 0, B 256, 50 epochs")
         plt.savefig(osp.join(args.out_dir, f"eigenmax{n}.png"))
         plt.clf()
 
