@@ -5,10 +5,10 @@ data_dir: data
 dataset: mnist
 dropout_prob: 0
 gpus: 1
-lr: 0.02
+lr: 0.1
 lr_drop: 0.1
-lr_steps: [50]
-max_epochs: 80
+lr_steps: []
+max_epochs: 40
 mlp_activation: relu
 mlp_hidden_dim: 256
 mlp_input_dim: 784
