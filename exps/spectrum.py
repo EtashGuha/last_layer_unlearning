@@ -65,7 +65,7 @@ class SpectrumMLP(MLP):
 
         ACCS.append([self.train_acc1, self.val_acc1])
         NORMS.append([(np(torch.linalg.norm(w, ord=2)), np(torch.linalg.norm(w, ord="fro"))) for w in weights])
-        SPECTRA.append([np(torch.linalg.svdvals(w))[:3] for w in weights])
+        SPECTRA.append([np(torch.linalg.svdvals(w))[:10] for w in weights])
 
         VAL_EIGENMAX.append(self.val_eigenmax)
         self.val_eigenmax = [0] * self.hparams.mlp_num_layers
