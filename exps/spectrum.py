@@ -127,18 +127,20 @@ def experiment(args):
     dashed_line = Line2D([], [], color="black", label="Spectral", linestyle="dashed")
     solid_line = Line2D([], [], color="black", label="Frobenius", linestyle="solid")
     
-    spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
-    plt.plot(x, spectral, label=f"(w: {width}, d: {depth})")
-    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch])
+    for width, depth in params:
+        spectral = [prod([epoch[w][0] for w in range(depth)]) for epoch in norms[(width, depth)]]
+        plt.plot(x, spectral, label=f"(w: {width}, d: {depth})")
+    plt.legend()
     plt.xlabel("Epoch")
     plt.ylabel("Product of Spectral Norms")
     plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
     plt.savefig(osp.join(args.out_dir, "prods1.png"))
     plt.clf()
 
-    frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
-    plt.plot(x, frobenius, label=f"(w: {width}, d: {depth})")
-    plt.legend(handles=[red_patch, blue_patch, green_patch, orange_patch])
+    for width, depth in params:
+        frobenius = [prod([epoch[w][1] for w in range(depth)]) for epoch in norms[(width, depth)]]
+        plt.plot(x, frobenius, label=f"(w: {width}, d: {depth})")
+    plt.legend()
     plt.xlabel("Epoch")
     plt.ylabel("Product of Frobenius Norms")
     plt.title("MNIST, SGD 0.1, WD 0, B 256, 40 epochs")
@@ -167,7 +169,7 @@ def experiment(args):
             plt.legend(handles=[red_patch, green_patch])
         elif depth == 3:
             blue_patch = Patch(color="blue", label="Hidden 2")
-            plt.legend(handles=[red_patch, blue_patch, green_patch], loc="center right")
+            plt.legend(handles=[red_patch, blue_patch, green_patch])
         plt.gca().add_artist(legend1)
         plt.xlabel("Epoch")
         plt.ylabel("Norm")
