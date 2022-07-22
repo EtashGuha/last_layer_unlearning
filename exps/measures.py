@@ -47,7 +47,7 @@ class MeasuresMLP(MLP):
         TRAIN_ACC.append(to_np(self.train_acc1))
         
         margins = to_np(torch.cat([result["margin"] for result in training_step_outputs]))
-        MARGIN.append(np.percentile(margins, 10)
+        MARGIN.append(np.percentile(margins, 10))
 
     def validation_epoch_end(self, validation_step_outputs):
         super().validation_epoch_end(validation_step_outputs)
