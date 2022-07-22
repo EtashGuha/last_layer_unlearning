@@ -55,8 +55,8 @@ class MeasuresMLP(MLP):
         TEST_ACC.append(to_np(self.test_acc1))
                       
         weights = [self.model[i].weight for i in self.fc_layers]
-        PROD_SPEC.append(to_np([torch.linalg.norm(w, ord=2)) for w in weights]).prod())
-        PROD_FRO.append(to_np([torch.linalg.norm(w, ord="fro")) for w in weights]).prod())
+        PROD_SPEC.append(to_np([torch.linalg.norm(w, ord=2) for w in weights]).prod())
+        PROD_FRO.append(to_np([torch.linalg.norm(w, ord="fro") for w in weights]).prod())
         
 def experiment(args):
     global TRAIN_ACC, TEST_ACC, PROD_SPEC, PROD_FRO, MARGIN
