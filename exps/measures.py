@@ -11,12 +11,14 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from groundzero.args import parse_args
 from groundzero.main import main
 from groundzero.mlp import MLP
+from groundzero.utils import compute_accuracy
 
 TRAIN_ACC = []
 TEST_ACC = []
 PROD_SPEC = []
 PROD_FRO = []
 MARGIN = []
+
 
 def to_np(x):
     if isinstance(x, torch.Tensor):
@@ -38,9 +40,9 @@ class MeasuresMLP(MLP):
         result = self.step(batch, idx)
         
         probs_wo_true = deepcopy(result["probs"])
-        inds = torch.repeat_interleave(targets.unsqueeze(1), self.hparams.classes, dim=1)
+        inds = torch.repeat_interleave(result["targets"].unsqueeze(1), self.hparams.classes, dim=1)
         probs_wo_true.scatter_(1, inds, 0)
-        result["margin"] = torch.gather(probs, 1, inds)[:,0] - torch.max(probs_wo_true, dim=1)[0]
+        result["margin"] = torch.gather(result["probs"], 1, inds)[:,0] - torch.max(probs_wo_true, dim=1)[0]
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
         result["acc1"] = acc1
@@ -63,8 +65,8 @@ class MeasuresMLP(MLP):
         TEST_ACC.append(to_np(self.val_acc1))
                       
         weights = [self.model[i].weight for i in self.fc_layers]
-        PROD_SPEC.append(to_np([torch.linalg.norm(w, ord=2) for w in weights]).prod())
-        PROD_FRO.append(to_np([torch.linalg.norm(w, ord="fro") for w in weights]).prod())
+        PROD_SPEC.append(to_np(torch.stack([torch.linalg.norm(w, ord=2) for w in weights])).prod())
+        PROD_FRO.append(to_np(torch.stack([torch.linalg.norm(w, ord="fro") for w in weights])).prod())
         
 def experiment(args):
     global TRAIN_ACC, TEST_ACC, PROD_SPEC, PROD_FRO, MARGIN
