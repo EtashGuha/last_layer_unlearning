@@ -21,7 +21,7 @@ MARGIN = []
 def to_np(x):
     if isinstance(x, torch.Tensor):
         return x.cpu().detach().numpy()
-    elif isinstance(x, np.array):
+    elif isinstance(x, np.ndarray):
         return x
     elif isinstance(x, list):
         return np.asarray(x)
