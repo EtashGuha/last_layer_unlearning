@@ -37,17 +37,12 @@ class MeasuresMLP(MLP):
         self.fc_layers = [3 * i for i in range(args.mlp_num_layers)]
         
     def training_step(self, batch, idx):
-        result = self.step(batch, idx)
-        
+        result = super().training_step(batch, idx)
+
         probs_wo_true = deepcopy(result["probs"])
         inds = torch.repeat_interleave(result["targets"].unsqueeze(1), self.hparams.classes, dim=1)
         probs_wo_true.scatter_(1, inds, 0)
         result["margin"] = torch.gather(result["probs"], 1, inds)[:,0] - torch.max(probs_wo_true, dim=1)[0]
-
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
-        result["acc1"] = acc1
-        self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return result
     
@@ -73,7 +68,7 @@ def experiment(args):
                       
     callbacks = [
         EarlyStopping(
-            monitor="train_loss",
+            monitor="loss",
             stopping_threshold=0.01,
         ),
     ]
