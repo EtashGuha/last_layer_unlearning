@@ -6,6 +6,7 @@ import torch
 
 import matplotlib.pyplot as plt
 import numpy as np
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from groundzero.args import parse_args
 from groundzero.main import main
