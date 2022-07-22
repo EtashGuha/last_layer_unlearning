@@ -70,7 +70,7 @@ class Model(pl.LightningModule):
         return result
 
     def training_epoch_end(self, training_step_outputs):
-        self.train_acc1 = torch.stack([result["acc1"] for result in training_step_outputs]).mean()
+        self.train_acc1 = torch.stack([result["acc1"] for result in training_step_outputs]).mean().item()
 
     def validation_step(self, batch, idx):
         result = self.step(batch, idx)
@@ -84,7 +84,7 @@ class Model(pl.LightningModule):
         return result
 
     def validation_epoch_end(self, validation_step_outputs):
-        self.val_acc1 = torch.stack([result["acc1"] for result in validation_step_outputs]).mean()
+        self.val_acc1 = torch.stack([result["acc1"] for result in validation_step_outputs]).mean().item()
 
     def test_step(self, batch, idx):
         result = self.step(batch, idx)
