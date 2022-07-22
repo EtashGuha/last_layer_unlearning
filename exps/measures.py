@@ -88,6 +88,14 @@ def experiment(args):
 
     plot(PROD_SPEC, "Product of Spectral Norms", "prod_spec")
     plot(PROD_FRO, "Product of Frobenius Norms", "prod_fro")
+    
+    # Removes negative margin (on MNIST, the first couple epochs).
+    MARGIN = MARGIN[MARGIN>0]
+    PROD_SPEC = PROD_SPEC[len(PROD_SPEC)-len(MARGIN):]
+    PROD_FRO = PROD_FRO[len(PROD_FRO)-len(MARGIN):]
+    TRAIN_ACC = TRAIN_ACC[len(TRAIN_ACC)-len(MARGIN):]
+    TEST_ACC = TEST_ACC[len(TEST_ACC)-len(MARGIN):]
+    
     plot(PROD_FRO / MARGIN, "Margin-Normalized Product of Spectral Norms", "prod_spec_margin")
     plot(PROD_FRO / MARGIN, "Margin-Normalized Product of Frobenius Norms", "prod_fro_margin")          
 
