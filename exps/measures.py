@@ -53,7 +53,7 @@ class MeasuresMLP(MLP):
     def validation_epoch_end(self, validation_step_outputs):
         super().validation_epoch_end(validation_step_outputs)
         
-        TEST_ACC.append(to_np(self.test_acc1))
+        TEST_ACC.append(to_np(self.val_acc1))
                       
         weights = [self.model[i].weight for i in self.fc_layers]
         PROD_SPEC.append(to_np([torch.linalg.norm(w, ord=2) for w in weights]).prod())
