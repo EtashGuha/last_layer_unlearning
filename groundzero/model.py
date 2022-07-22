@@ -63,7 +63,7 @@ class Model(pl.LightningModule):
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
         result["acc1"] = acc1
-        self.log("train_loss", result["loss"], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        #self.log("train_loss", result["loss"], on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
 
