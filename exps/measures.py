@@ -32,10 +32,11 @@ class MeasuresMLP(MLP):
     def training_step(self, batch, idx):
         result = super().training_step(batch, idx)
 
-        probs_wo_true = deepcopy(result["probs"])
-        inds = torch.repeat_interleave(result["targets"].unsqueeze(1), self.hparams.classes, dim=1)
-        probs_wo_true.scatter_(1, inds, 0)
-        result["margin"] = torch.gather(result["probs"], 1, inds)[:,0] - torch.max(probs_wo_true, dim=1)[0]
+        with torch.no_grad():
+            probs_wo_true = deepcopy(result["probs"])
+            inds = torch.repeat_interleave(result["targets"].unsqueeze(1), self.hparams.classes, dim=1)
+            probs_wo_true.scatter_(1, inds, 0)
+            result["margin"] = torch.gather(result["probs"], 1, inds)[:,0] - torch.max(probs_wo_true, dim=1)[0]
 
         return result
     
