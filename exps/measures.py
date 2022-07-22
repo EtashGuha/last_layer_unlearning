@@ -19,7 +19,14 @@ PROD_FRO = []
 MARGIN = []
 
 def to_np(x):
-    return x.cpu().detach().numpy()
+    if isinstance(x, torch.Tensor):
+        return x.cpu().detach().numpy()
+    elif isinstance(x, np.array):
+        return x
+    elif isinstance(x, list):
+        return np.asarray(x)
+    else:
+        raise ValueError("Unrecognized type")
 
 class MeasuresMLP(MLP):
     def __init__(self, args, classes):
