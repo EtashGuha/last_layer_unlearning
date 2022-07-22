@@ -21,14 +21,7 @@ MARGIN = []
 
 
 def to_np(x):
-    if isinstance(x, torch.Tensor):
-        return x.cpu().detach().numpy()
-    elif isinstance(x, np.ndarray):
-        return x
-    elif isinstance(x, list):
-        return np.asarray(x)
-    else:
-        raise ValueError("Unrecognized type")
+    return x.cpu().detach().numpy()
 
 class MeasuresMLP(MLP):
     def __init__(self, args, classes):
@@ -49,7 +42,7 @@ class MeasuresMLP(MLP):
     def training_epoch_end(self, training_step_outputs):
         super().training_epoch_end(training_step_outputs)
         
-        TRAIN_ACC.append(to_np(self.train_acc1))
+        TRAIN_ACC.append(self.train_acc1)
         
         margins = to_np(torch.cat([result["margin"] for result in training_step_outputs]))
         MARGIN.append(np.percentile(margins, 10))
@@ -57,7 +50,7 @@ class MeasuresMLP(MLP):
     def validation_epoch_end(self, validation_step_outputs):
         super().validation_epoch_end(validation_step_outputs)
         
-        TEST_ACC.append(to_np(self.val_acc1))
+        TEST_ACC.append(self.val_acc1)
                       
         weights = [self.model[i].weight for i in self.fc_layers]
         PROD_SPEC.append(to_np(torch.stack([torch.linalg.norm(w, ord=2) for w in weights])).prod())
@@ -68,16 +61,23 @@ def experiment(args):
                       
     callbacks = [
         EarlyStopping(
-            monitor="loss",
+            monitor="train_loss",
             stopping_threshold=0.01,
         ),
     ]
-                      
+    
+    args.num_sanity_val_steps = 0
     main(args, MeasuresMLP, callbacks=callbacks)
+    
+    TRAIN_ACC = np.asarray(TRAIN_ACC)
+    TEST_ACC = np.asarray(TEST_ACC)
+    PROD_SPEC = np.asarray(PROD_SPEC)
+    PROD_FRO = np.asarray(PROD_FRO)
+    MARGIN = np.asarray(MARGIN)
                       
     def plot(measure, xlabel, name):
-        plt.plot(measure, TRAIN_ACC, label="Train", linestyle="dashed")
-        plt.plot(measure, TEST_ACC, label="Test", linestyle="solid")
+        plt.plot(measure, 1-TRAIN_ACC, label="Train", linestyle="dashed")
+        plt.plot(measure, 1-TEST_ACC, label="Test", linestyle="solid")
         plt.legend()
         plt.xlabel(xlabel)
         plt.ylabel("0-1 Error")
