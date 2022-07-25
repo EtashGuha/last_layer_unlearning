@@ -39,16 +39,17 @@ class MeasuresMLP(MLP):
         with torch.no_grad():
             # Sharpness 2-layer only
             inputs, targets = batch
+            inputs.reshape(inputs.shape[0], -1)
             w1 = deepcopy(self.model[0].weight)
             for sigma in SIGMA:
                 self.model[0].weight = torch.normal(w1, sigma)
                 logits = self.model(inputs)
                 result["sharp"] = F.cross_entropy(logits, targets)
                 
-                wx = w1 @ x
+                wx = inputs @ w1.T
                 sigmoid_apx = (1 + torch.exp(-wx)) ** -1
                 sigmoid_apx += (784 * sigma ** 2) / 2 * ((2 * torch.exp(-2 * wx) / (1 + torch.exp(-wx)) ** 3) - (torch.exp(-wx) / (1 + torch.exp(-wx)) ** 2))
-                logits_apx = self.model[self.fc_layers[1]].weight @ sigmoid_apx
+                logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
                 result["sharp_apx"] = F.cross_entropy(logits_apx, targets)
                 
             self.model[0].weight = w1
@@ -84,7 +85,7 @@ class MeasuresMLP(MLP):
         TEST_ACC.append(self.val_acc1)
         
 def experiment(args):
-    global TRAIN_ACC, TEST_ACC, PROD_SPEC, PROD_FRO, MARGIN
+    global TRAIN_ACC, TEST_ACC, SHARP, SHARP_APX, PROD_SPEC, PROD_FRO, MARGIN
                       
     callbacks = [
         EarlyStopping(
@@ -119,7 +120,8 @@ def experiment(args):
     plt.plot(x, SHARP_APX, label="Approximation", linestyle="solid")
     plt.xlabel("Epoch")
     plt.ylabel("Sharpness")
-    plt.title("MNIST, SGD 0.05, WD 0, B 256, Loss 0.1")
+    plt.legend()
+    plt.title("MNIST, SGD 0.05, WD 0, B 256, Loss 0.01")
     plt.savefig(osp.join(args.out_dir, "sharpness.png"))
     plt.clf()
              
