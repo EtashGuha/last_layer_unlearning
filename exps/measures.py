@@ -53,8 +53,7 @@ class MeasuresMLP(MLP):
                 # maclaurin
                 wx = inputs @ w1.T
                 sigmoid_apx = (torch.exp(-wx) + 1) ** -1
-                sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3)
-                sigmoid_apx *= ((sigma * norm) ** 2).view(-1, 1)
+                sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3) * ((sigma * norm) ** 2).view(-1, 1)
                 logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
                 result["sharp_apx1"] = F.cross_entropy(logits_apx, targets)
                 
