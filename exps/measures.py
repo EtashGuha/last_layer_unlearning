@@ -43,9 +43,12 @@ class MeasuresMLP(MLP):
             inputs = inputs.reshape(inputs.shape[0], -1)
             w1 = deepcopy(self.model[0].weight)
             for sigma in SIGMA:
-                # do multiple times?
-                self.model[0].weight = torch.nn.Parameter(torch.normal(w1, sigma))
-                logits = self.model(inputs)
+                avg = []
+                for _ in range(10):
+                    self.model[0].weight = torch.nn.Parameter(torch.normal(w1, sigma))
+                    avg.append(self.model(inputs))
+                avg = torch.stack(avg)
+                logits = torch.mean(avg, dim=0)
                 result["sharp"] = F.cross_entropy(logits, targets)
                 
                 norm = torch.linalg.vector_norm(inputs, dim=1)
