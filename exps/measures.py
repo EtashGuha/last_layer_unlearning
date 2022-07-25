@@ -1,5 +1,5 @@
 from copy import deepcopy
-from math import log
+from math import log, pi
 import os.path as osp
 
 import torch
@@ -18,7 +18,8 @@ SIGMA = [0.1]
 TRAIN_ACC = []
 TEST_ACC = []
 SHARP = []
-SHARP_APX = []
+SHARP_APX1 = []
+SHARP_APX2 = []
 PROD_SPEC = []
 PROD_FRO = []
 MARGIN = []
@@ -42,15 +43,23 @@ class MeasuresMLP(MLP):
             inputs.reshape(inputs.shape[0], -1)
             w1 = deepcopy(self.model[0].weight)
             for sigma in SIGMA:
+                # do multiple times?
                 self.model[0].weight = torch.normal(w1, sigma)
                 logits = self.model(inputs)
                 result["sharp"] = F.cross_entropy(logits, targets)
                 
+                # maclaurin
                 wx = inputs @ w1.T
-                sigmoid_apx = (1 + torch.exp(-wx)) ** -1
-                sigmoid_apx += (784 * sigma ** 2) / 2 * ((2 * torch.exp(-2 * wx) / (1 + torch.exp(-wx)) ** 3) - (torch.exp(-wx) / (1 + torch.exp(-wx)) ** 2))
+                sigmoid_apx = (torch.exp(-wx) + 1) ** -1
+                sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3) * (sigma * torch.linalg.vector_norm(inputs, dim=1)) ** 2
                 logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
-                result["sharp_apx"] = F.cross_entropy(logits_apx, targets)
+                result["sharp_apx1"] = F.cross_entropy(logits_apx, targets)
+                
+                # probit
+                cdf = torch.distributions.normal.Normal(0,1).cdf
+                sigmoid_apx = cdf(wx / torch.sqrt(torch.tensor(8/pi) + (sigma * torch.linalg.vector_norm(inputs, dim=1)) ** 2))
+                logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
+                result["sharp_apx2"] = F.cross_entropy(logits_apx, targets)
                 
             self.model[0].weight = w1
             
@@ -68,9 +77,11 @@ class MeasuresMLP(MLP):
         TRAIN_ACC.append(self.train_acc1)
         
         sharps = to_np(torch.cat([result["sharp"] for result in training_step_outputs]))
-        sharps_apx = to_np(torch.cat([result["sharp_apx"] for result in training_step_outputs]))
+        sharps_apx1 = to_np(torch.cat([result["sharp_apx1"] for result in training_step_outputs]))
+        sharps_apx2 = to_np(torch.cat([result["sharp_apx2"] for result in training_step_outputs]))
         SHARP.append(sharps.mean())
-        SHARP_APX.append(sharps_apx.mean())
+        SHARP_APX1.append(sharps_apx1.mean())
+        SHARP_APX2.append(sharps_apx2.mean())
         
         margins = to_np(torch.cat([result["margin"] for result in training_step_outputs]))
         MARGIN.append(np.percentile(margins, 10))
@@ -85,7 +96,7 @@ class MeasuresMLP(MLP):
         TEST_ACC.append(self.val_acc1)
         
 def experiment(args):
-    global TRAIN_ACC, TEST_ACC, SHARP, SHARP_APX, PROD_SPEC, PROD_FRO, MARGIN
+    global TRAIN_ACC, TEST_ACC, SHARP, SHARP_APX1, SHARP_APX2, PROD_SPEC, PROD_FRO, MARGIN
                       
     callbacks = [
         EarlyStopping(
@@ -116,8 +127,9 @@ def experiment(args):
         plt.clf()
         
     x = np.arange(len(SHARP))
-    plt.plot(x, SHARP, label="Actual", linestyle="dashed")
-    plt.plot(x, SHARP_APX, label="Approximation", linestyle="solid")
+    plt.plot(x, SHARP, label="Actual", linestyle="solid")
+    plt.plot(x, SHARP_APX1, label="Maclaurin", linestyle="dashed")
+    plt.plot(x, SHARP_APX2, label="Probit", linestyle="dotted")
     plt.xlabel("Epoch")
     plt.ylabel("Sharpness")
     plt.legend()
