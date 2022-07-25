@@ -40,24 +40,28 @@ class MeasuresMLP(MLP):
         with torch.no_grad():
             # Sharpness 2-layer only
             inputs, targets = batch
-            inputs.reshape(inputs.shape[0], -1)
+            inputs = inputs.reshape(inputs.shape[0], -1)
             w1 = deepcopy(self.model[0].weight)
             for sigma in SIGMA:
                 # do multiple times?
-                self.model[0].weight = torch.normal(w1, sigma)
+                self.model[0].weight = torch.nn.Parameter(torch.normal(w1, sigma))
                 logits = self.model(inputs)
                 result["sharp"] = F.cross_entropy(logits, targets)
+                
+                norm = torch.linalg.vector_norm(inputs, dim=1)
                 
                 # maclaurin
                 wx = inputs @ w1.T
                 sigmoid_apx = (torch.exp(-wx) + 1) ** -1
-                sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3) * (sigma * torch.linalg.vector_norm(inputs, dim=1)) ** 2
+                sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3)
+                sigmoid_apx *= ((sigma * norm) ** 2).view(-1, 1)
                 logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
                 result["sharp_apx1"] = F.cross_entropy(logits_apx, targets)
                 
                 # probit
                 cdf = torch.distributions.normal.Normal(0,1).cdf
-                sigmoid_apx = cdf(wx / torch.sqrt(torch.tensor(8/pi) + (sigma * torch.linalg.vector_norm(inputs, dim=1)) ** 2))
+                denom = torch.sqrt(torch.tensor(8/pi) + (sigma * norm) ** 2)
+                sigmoid_apx = cdf(wx / denom.view(-1, 1))
                 logits_apx = sigmoid_apx @ self.model[self.fc_layers[1]].weight.T
                 result["sharp_apx2"] = F.cross_entropy(logits_apx, targets)
                 
@@ -76,9 +80,9 @@ class MeasuresMLP(MLP):
         
         TRAIN_ACC.append(self.train_acc1)
         
-        sharps = to_np(torch.cat([result["sharp"] for result in training_step_outputs]))
-        sharps_apx1 = to_np(torch.cat([result["sharp_apx1"] for result in training_step_outputs]))
-        sharps_apx2 = to_np(torch.cat([result["sharp_apx2"] for result in training_step_outputs]))
+        sharps = to_np(torch.stack([result["sharp"] for result in training_step_outputs]))
+        sharps_apx1 = to_np(torch.stack([result["sharp_apx1"] for result in training_step_outputs]))
+        sharps_apx2 = to_np(torch.stack([result["sharp_apx2"] for result in training_step_outputs]))
         SHARP.append(sharps.mean())
         SHARP_APX1.append(sharps_apx1.mean())
         SHARP_APX2.append(sharps_apx2.mean())
