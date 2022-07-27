@@ -1,5 +1,7 @@
 import torch
 
+import numpy as np
+
 def compute_accuracy(probs, targets):
     preds1 = torch.argmax(probs, dim=1)
     _, preds5 = torch.topk(probs, k=5, dim=1)
@@ -12,3 +14,12 @@ def compute_accuracy(probs, targets):
 
     return acc1, acc5
 
+def to_np(x):
+    if isinstance(x, torch.Tensor):
+        return x.cpu().detach().numpy()
+    elif isinstance(x, np.ndarray):
+        return x
+    elif isinstance(x, list):
+        return np.asarray(x)
+    else:
+        raise ValueError("Undefined.")
