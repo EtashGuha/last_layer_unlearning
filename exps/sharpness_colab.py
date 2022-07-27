@@ -13,16 +13,21 @@ from groundzero.main import main
 from groundzero.mlp import MLP
 from groundzero.utils import compute_accuracy
 
-SIGMA = [0.02, 0.05, 0.1]
+SIGMA = [0.01, 0.02, 0.05, 0.1]
 MC_SAMPLES = 10
-LOSS_THRESH = 0.25
+LOSS_THRESH = 0.5
 SHARP = []
 SHARP_APX1 = []
 SHARP_APX2 = []
 
 
 def to_np(x):
-    return x.cpu().detach().numpy()
+    if isinstance(x, torch.Tensor):
+        return x.cpu().detach().numpy()
+    elif isinstance(x, list):
+        return np.asarray(x)
+    else:
+        raise ValueError("Undefined.")
 
 class SharpnessMLP(MLP):
     def __init__(self, args, classes):
@@ -50,7 +55,8 @@ class SharpnessMLP(MLP):
                 for _ in range(MC_SAMPLES):
                     avg.append(torch.sigmoid(inputs @ torch.normal(w1, sigma).T) @ w2.T)
                 logits = torch.mean(torch.stack(avg), dim=0)
-                sharp.append(F.cross_entropy(logits, targets) - result["loss"])
+                val = F.cross_entropy(logits, targets) - result["loss"]
+                sharp.append(val.item())
 
                 # maclaurin
                 wx = inputs @ w1.T
@@ -58,14 +64,16 @@ class SharpnessMLP(MLP):
                 sigmoid_apx += ((torch.exp(-wx) - 1) * torch.exp(-wx)) / (2 * (torch.exp(-wx) + 1) ** 3) * ((sigma * norm) ** 2).view(-1, 1)
                 sigmoid_apx += (((torch.exp(-3 * wx) - 11 * torch.exp(-2 * wx) + 11 * torch.exp(-wx) -1) * torch.exp(-wx) )/ (8 * (torch.exp(-wx) + 1) ** 5)) * ((sigma * norm) ** 4).view(-1, 1)
                 logits_apx = sigmoid_apx @ w2.T
-                sharp_apx1.append(F.cross_entropy(logits_apx, targets) - result["loss"])
+                val = F.cross_entropy(logits_apx, targets) - result["loss"]
+                sharp_apx1.append(val.item())
 
                 # probit
                 cdf = torch.distributions.normal.Normal(0,1).cdf
                 denom = torch.sqrt(torch.tensor(8/pi) + (sigma * norm) ** 2)
                 sigmoid_apx = cdf(wx / denom.view(-1, 1))
                 logits_apx = sigmoid_apx @ w2.T
-                sharp_apx2.append(F.cross_entropy(logits_apx, targets) - result["loss"])
+                val = F.cross_entropy(logits_apx, targets) - result["loss"]
+                sharp_apx2.append(val.item())
             
             result["sharp"] = sharp
             result["sharp_apx1"] = sharp_apx1
@@ -76,13 +84,13 @@ class SharpnessMLP(MLP):
     def training_epoch_end(self, training_step_outputs):
         super().training_epoch_end(training_step_outputs)
         
-        sharp = to_np(torch.stack([result["sharp"] for result in training_step_outputs]))
-        sharp_apx1 = to_np(torch.stack([result["sharp_apx1"] for result in training_step_outputs]))
-        sharp_apx2 = to_np(torch.stack([result["sharp_apx2"] for result in training_step_outputs]))
+        sharp = [result["sharp"] for result in training_step_outputs]
+        sharp_apx1 = [result["sharp_apx1"] for result in training_step_outputs]
+        sharp_apx2 = [result["sharp_apx2"] for result in training_step_outputs]
         
-        SHARP.append(torch.mean(sharp, dim=1))
-        SHARP_APX1.append(torch.mean(sharp_apx1, dim=1))
-        SHARP_APX2.append(torch.mean(sharp_apx2, dim=1))
+        SHARP.extend(sharp)
+        SHARP_APX1.extend(sharp_apx1)
+        SHARP_APX2.extend(sharp_apx2)
         
 def experiment(args):
     global SHARP, SHARP_APX1, SHARP_APX2
@@ -111,7 +119,7 @@ def experiment(args):
         plt.plot(x, sharp, label=f"Actual - {MC_SAMPLES} MC samples", linestyle="solid")
         plt.plot(x, sharp_apx1, label="Maclaurin - 3 terms", linestyle="dashed")
         plt.plot(x, sharp_apx2, label="Probit", linestyle="dotted")
-        plt.xlabel("Epoch")
+        plt.xlabel("Step")
         plt.ylabel("Sharpness")
         plt.legend()
         plt.title(f"MNIST, SGD 0.05, SIGMA {sigma}, WD 0, B 256, LOSS {LOSS_THRESH}")
