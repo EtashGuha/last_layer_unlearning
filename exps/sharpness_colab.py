@@ -14,7 +14,8 @@ from groundzero.mlp import MLP
 from groundzero.utils import compute_accuracy
 
 SIGMA = 0.02
-MC_SAMPLES = 5
+MC_SAMPLES = 10
+LOSS_THRESH = 0.25
 SHARP = []
 SHARP_APX1 = []
 SHARP_APX2 = []
@@ -80,7 +81,7 @@ def experiment(args):
     callbacks = [
         EarlyStopping(
             monitor="train_loss",
-            stopping_threshold=0.25,
+            stopping_threshold=LOSS_THRESH,
         ),
     ]
     
@@ -92,13 +93,13 @@ def experiment(args):
     SHARP_APX2 = np.asarray(SHARP_APX2)
     
     x = np.arange(len(SHARP))
-    plt.plot(x, SHARP, label="Actual", linestyle="solid")
-    plt.plot(x, SHARP_APX1, label="Maclaurin", linestyle="dashed")
+    plt.plot(x, SHARP, label=f"Actual - {MC_SAMPLES} MC samples", linestyle="solid")
+    plt.plot(x, SHARP_APX1, label="Maclaurin - 3 terms", linestyle="dashed")
     plt.plot(x, SHARP_APX2, label="Probit", linestyle="dotted")
     plt.xlabel("Epoch")
     plt.ylabel("Sharpness")
     plt.legend()
-    plt.title("MNIST, SGD 0.05, SIGMA 0.02, WD 0, B 256, Loss 0.01")
+    plt.title(f"MNIST, SGD 0.05, SIGMA {SIGMA}, WD 0, B 256, LOSS {LOSS_THRESH}")
     plt.savefig(osp.join(args.out_dir, "sharpness.png"))
     plt.clf()      
 
