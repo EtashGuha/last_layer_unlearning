@@ -2,6 +2,7 @@ import torch
 
 import numpy as np
 
+
 def compute_accuracy(probs, targets):
     preds1 = torch.argmax(probs, dim=1)
     _, preds5 = torch.topk(probs, k=5, dim=1)
