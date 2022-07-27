@@ -10,6 +10,7 @@ lr_drop: 0.1
 lr_steps: []
 max_epochs: 50
 mlp_activation: relu
+mlp_bias: True
 mlp_hidden_dim: 256
 mlp_input_dim: 784
 mlp_num_layers: 2
