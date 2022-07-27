@@ -1,5 +1,4 @@
-from copy import deepcopy
-from math import log, pi
+from math import pi
 import os.path as osp
 
 import torch
