@@ -13,9 +13,10 @@ from groundzero.main import main
 from groundzero.mlp import MLP
 from groundzero.utils import compute_accuracy
 
-SIGMA = [0.01, 0.02, 0.05, 0.1]
+SIGMA = [0.01, 0.02, 0.05]
 MC_SAMPLES = 10
-LOSS_THRESH = 0.5
+MOVING_AVG = 10
+LOSS_THRESH = 0.25
 SHARP = []
 SHARP_APX1 = []
 SHARP_APX2 = []
@@ -91,7 +92,10 @@ class SharpnessMLP(MLP):
         SHARP.extend(sharp)
         SHARP_APX1.extend(sharp_apx1)
         SHARP_APX2.extend(sharp_apx2)
-        
+
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'valid') / w
+
 def experiment(args):
     global SHARP, SHARP_APX1, SHARP_APX2
                       
@@ -108,18 +112,20 @@ def experiment(args):
     SHARP = np.asarray(SHARP)
     SHARP_APX1 = np.asarray(SHARP_APX1)
     SHARP_APX2 = np.asarray(SHARP_APX2)
-    
-    x = np.arange(len(SHARP))
+
+    # TODO: Pickle sharps.
+    # TODO: Different Maclaurin terms.
     
     for j, sigma in enumerate(SIGMA):
-        sharp = SHARP[:, j]
-        sharp_apx1 = SHARP_APX1[:, j]
-        sharp_apx2 = SHARP_APX2[:, j]
+        sharp = moving_average(SHARP[:, j], MOVING_AVG)
+        sharp_apx1 = moving_average(SHARP_APX1[:, j], MOVING_AVG)
+        sharp_apx2 = moving_average(SHARP_APX2[:, j], MOVING_AVG)
         
+        x = np.arange(len(sharp))
         plt.plot(x, sharp, label=f"Actual - {MC_SAMPLES} MC samples", linestyle="solid")
         plt.plot(x, sharp_apx1, label="Maclaurin - 3 terms", linestyle="dashed")
         plt.plot(x, sharp_apx2, label="Probit", linestyle="dotted")
-        plt.xlabel("Step")
+        plt.xlabel("Step (Moving Avg)")
         plt.ylabel("Sharpness")
         plt.legend()
         plt.title(f"MNIST, SGD 0.05, SIGMA {sigma}, WD 0, B 256, LOSS {LOSS_THRESH}")
