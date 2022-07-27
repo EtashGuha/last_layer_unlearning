@@ -9,7 +9,7 @@ lr: 0.05
 lr_drop: 0.1
 lr_steps: []
 max_epochs: 1000
-mlp_activation: relu
+mlp_activation: sigmoid
 mlp_bias: False
 mlp_hidden_dim: 512
 mlp_input_dim: 784
