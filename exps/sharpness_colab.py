@@ -116,7 +116,7 @@ def experiment(args):
     SHARP_APX2 = np.asarray(SHARP_APX2)
     SHARP_APX3 = np.asarray(SHARP_APX3)
 
-    with open("sharp.pkl", "wb") as f:
+    with open(osp.join(args.out_dir, "sharp.pkl"), "wb") as f:
         pickle.dump(f, np.concatenate((SHARP, SHARP_APX1, SHARP_APX2, SHARP_APX3), dim=0))
     
     for j, sigma in enumerate(SIGMA):
