@@ -22,9 +22,9 @@ class MLP(Model):
         shapes = zip([args.mlp_input_dim] + h, h + [args.classes])
         for i, (n, k) in enumerate(shapes):
             if i == args.mlp_num_layers - 1:
-                self.model.append(nn.Linear(n, k))
+                self.model.append(nn.Linear(n, k, bias=args.mlp_bias))
             else:
-                self.model.append(nn.Linear(n, k))
+                self.model.append(nn.Linear(n, k, bias=args.mlp_bias))
                 self.model.append(activation())
                 self.model.append(nn.Dropout(args.dropout_prob))
 
