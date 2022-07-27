@@ -24,6 +24,7 @@ def add_input_args(parser):
     parser.add("--lr_drop", type=float)
     parser.add("--lr_steps", nargs="*", type=int)
     parser.add("--mlp_activation", choices=["relu", "sigmoid"])
+    parser.add("--mlp_bias", action="store_true")
     parser.add("--mlp_hidden_dim", type=int)
     parser.add("--mlp_input_dim", type=int)
     parser.add("--mlp_num_layers", type=int)
