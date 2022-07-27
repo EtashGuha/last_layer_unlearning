@@ -117,7 +117,7 @@ def experiment(args):
     SHARP_APX3 = np.asarray(SHARP_APX3)
 
     with open(osp.join(args.out_dir, "sharp.pkl"), "wb") as f:
-        pickle.dump(f, np.concatenate((SHARP, SHARP_APX1, SHARP_APX2, SHARP_APX3), axis=0))
+        pickle.dump(np.concatenate((SHARP, SHARP_APX1, SHARP_APX2, SHARP_APX3), axis=0), f)
     
     for j, sigma in enumerate(SIGMA):
         sharp = moving_average(SHARP[:, j], MOVING_AVG)
