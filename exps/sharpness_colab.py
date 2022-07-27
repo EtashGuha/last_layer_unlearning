@@ -122,9 +122,9 @@ def experiment(args):
         sharp_apx2 = moving_average(SHARP_APX2[:, j], MOVING_AVG)
         
         x = np.arange(len(sharp))
-        plt.plot(x, sharp, label=f"Actual - {MC_SAMPLES} MC samples", linestyle="solid")
-        plt.plot(x, sharp_apx1, label="Maclaurin - 3 terms", linestyle="dashed")
-        plt.plot(x, sharp_apx2, label="Probit", linestyle="dotted")
+        plt.plot(x, sharp, label=f"Actual - {MC_SAMPLES} MC samples")
+        plt.plot(x, sharp_apx1, label="Maclaurin - 3 terms")
+        plt.plot(x, sharp_apx2, label="Probit")
         plt.xlabel("Step (Moving Avg)")
         plt.ylabel("Sharpness")
         plt.legend()
