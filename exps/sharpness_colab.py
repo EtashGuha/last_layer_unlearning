@@ -128,7 +128,7 @@ def experiment(args):
         plt.xlabel("Step (Moving Avg)")
         plt.ylabel("Sharpness")
         plt.legend()
-        plt.title(f"MNIST, SGD 0.05, SIGMA {sigma}, WD 0, B 256, LOSS {LOSS_THRESH}")
+        plt.title(f"MNIST, (w: {args.mlp_hidden_dim}, d: {args.mlp_num_layers}), SGD 0.05, SIGMA {sigma}, B 256, LOSS {LOSS_THRESH}")
         plt.savefig(osp.join(args.out_dir, f"sharpness_sigma{sigma}.png"))
         plt.clf()      
 
