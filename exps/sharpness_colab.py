@@ -16,7 +16,7 @@ from groundzero.utils import compute_accuracy, to_np
 
 SIGMA = [0.01, 0.02, 0.05]
 MC_SAMPLES = 10
-MOVING_AVG = 10
+MOVING_AVG = 20
 LOSS_THRESH = 0.25
 SHARP = []
 SHARP_APX1 = []
@@ -117,7 +117,7 @@ def experiment(args):
     SHARP_APX3 = np.asarray(SHARP_APX3)
 
     with open(osp.join(args.out_dir, "sharp.pkl"), "wb") as f:
-        pickle.dump(f, np.concatenate((SHARP, SHARP_APX1, SHARP_APX2, SHARP_APX3), dim=0))
+        pickle.dump(f, np.concatenate((SHARP, SHARP_APX1, SHARP_APX2, SHARP_APX3), axis=0))
     
     for j, sigma in enumerate(SIGMA):
         sharp = moving_average(SHARP[:, j], MOVING_AVG)
