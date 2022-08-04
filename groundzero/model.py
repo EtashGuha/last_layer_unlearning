@@ -98,4 +98,3 @@ class Model(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx):
         return NotImplementedError
-
