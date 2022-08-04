@@ -12,7 +12,7 @@ class CNN(Model):
         h = args.cnn_initial_width * [2 ** i for i in range(0, args.cnn_num_layers - 1)]
         
         channels = zip([args.input_dim] + h[:-1], h)
-        for n, k in args.cnn_layer_channels:
+        for n, k in channels:
           self.model.append(nn.Conv2d(n, k, args.cnn_kernel_size, bias=args.bias))
           self.model.append(nn.BatchNorm2d(k))
           self.model.append(nn.ReLU())
