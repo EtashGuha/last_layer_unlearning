@@ -19,6 +19,7 @@ def add_input_args(parser):
     parser.add("--bias", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--classes", type=int)
     parser.add("--cnn_initial_width", type=int)
+    parser.add("--cnn_kernel_size", type=int)
     parser.add("--cnn_num_layers", type=int)
     parser.add("--data_dir")
     parser.add("--dataset", choices=["cifar10", "mnist"])
