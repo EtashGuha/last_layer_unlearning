@@ -1,6 +1,7 @@
 from configargparse import Parser
 from pytorch_lightning import Trainer
 
+
 def parse_args():
     parser = Parser(
         args_for_setting_config_path=["-c", "--cfg", "--config"],
