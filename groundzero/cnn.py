@@ -20,6 +20,12 @@ class CNN(Model):
         
         self.model.append(nn.Flatten())
         self.model.append(nn.Linear(h[-1], args.classes, bias=args.bias))
+        
+        if args.train_fc_only:
+            for p in self.model.parameters():
+                p.requires_grad = False
+            for p in self.model[-1].parameters():
+                p.requires_grad = True
 
     def forward(self, inputs):
         outputs = self.model(inputs)
