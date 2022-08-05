@@ -15,7 +15,7 @@ class CNN(Model):
         for n, k in channels:
             self.model.append(nn.Conv2d(n, k, args.cnn_kernel_size, bias=args.bias))
             self.model.append(nn.BatchNorm2d(k))
-            self.model.append(nn.ReLU())
+            self.model.append(nn.ReLU(inplace=True))
             self.model.append(nn.MaxPool2d(2))
         
         self.model.append(nn.Flatten())
