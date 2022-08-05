@@ -10,6 +10,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProg
 from pytorch_lightning.utilities.seed import seed_everything
 
 from groundzero.args import parse_args
+from groundzero.cnn import CNN
 from groundzero.resnet import ResNet
 from groundzero.mlp import MLP
 
