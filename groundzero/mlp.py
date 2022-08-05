@@ -22,6 +22,12 @@ class MLP(Model):
                 self.model.append(nn.Linear(n, k, bias=args.bias))
                 self.model.append(activation())
                 self.model.append(nn.Dropout(args.dropout_prob))
+                
+         if args.train_fc_only:
+            for p in self.model.parameters():
+                p.requires_grad = False
+            for p in self.model[-1].parameters():
+                p.requires_grad = True
 
     def forward(self, inputs):
         inputs = inputs.reshape(inputs.shape[0], -1)
