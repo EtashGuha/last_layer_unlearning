@@ -19,8 +19,8 @@ class CNN(Model):
             self.model.append(nn.MaxPool2d(2))
         
         self.model.append(nn.Flatten())
-        self.model.append(nn.Linear(h[-1], args.classes, bias=args.bias))
-        
+        self.model.append(nn.LazyLinear(args.classes, bias=args.bias))
+
         if args.train_fc_only:
             for p in self.model.parameters():
                 p.requires_grad = False
