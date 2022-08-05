@@ -13,10 +13,10 @@ class CNN(Model):
         
         channels = zip([args.cnn_input_dim] + h[:-1], h)
         for n, k in channels:
-          self.model.append(nn.Conv2d(n, k, args.cnn_kernel_size, bias=args.bias))
-          self.model.append(nn.BatchNorm2d(k))
-          self.model.append(nn.ReLU())
-          self.model.append(nn.MaxPool2d(2))
+            self.model.append(nn.Conv2d(n, k, args.cnn_kernel_size, bias=args.bias))
+            self.model.append(nn.BatchNorm2d(k))
+            self.model.append(nn.ReLU())
+            self.model.append(nn.MaxPool2d(2))
         
         self.model.append(nn.Flatten())
         self.model.append(nn.Linear(h[-1], args.classes, bias=args.bias))
