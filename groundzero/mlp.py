@@ -23,7 +23,7 @@ class MLP(Model):
                 self.model.append(activation())
                 self.model.append(nn.Dropout(args.dropout_prob))
                 
-         if args.train_fc_only:
+        if args.train_fc_only:
             for p in self.model.parameters():
                 p.requires_grad = False
             for p in self.model[-1].parameters():
