@@ -1,10 +1,14 @@
 arch: resnet
 batch_size: 256
 classes: 10
+cnn_initial_width: 16
+cnn_kernel_size: 3
+cnn_num_layers: 3
 data_dir: data
 dataset: cifar10
 dropout_prob: 0
 gpus: 1
+input_dim: 3072
 lr: 0.02
 lr_drop: 0.1
 lr_steps: []
@@ -12,7 +16,6 @@ max_epochs: 50
 mlp_activation: relu
 mlp_bias: True
 mlp_hidden_dim: 128
-mlp_input_dim: 3072
 mlp_num_layers: 2
 momentum: 0.9
 optimizer: sgd
