@@ -9,7 +9,7 @@ class CNN(Model):
 
         self.model = nn.Sequential()
 
-        h = args.cnn_initial_width * [2 ** i for i in range(0, args.cnn_num_layers - 1)]
+        h = [args.cnn_initial_width * j for j in [2 ** i for i in range(0, args.cnn_num_layers)]]
         
         channels = zip([args.cnn_input_dim] + h[:-1], h)
         for n, k in channels:
