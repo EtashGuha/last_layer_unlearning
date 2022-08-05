@@ -1,9 +1,4 @@
-from math import pi
 import os.path as osp
-import pickle
-
-import torch
-import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,10 +7,10 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from groundzero.args import parse_args
 from groundzero.cnn import CNN
 from groundzero.main import main
-from groundzero.utils import compute_accuracy, to_np
 
 ACCS = [0, 0, 0]
 LOSS_THRESH = 0.01
+TRAIN_PROPORTION = 0.1
 WIDTHS = [16, 32, 64]
 
 
@@ -32,7 +27,7 @@ class OverfitCNN(CNN):
 
 def experiment(args):
     global ACCS
-                      
+    
     callbacks = [
         EarlyStopping(
             monitor="train_loss",
@@ -40,19 +35,21 @@ def experiment(args):
         ),
     ]
     
-    main(args, OverfitCNN, callbacks=callbacks)
+    args.limit_train_batches = TRAIN_PROPORTION
     
-    for j, sigma in enumerate(WIDTHS):
-        x = np.arange(len(sharp))
-        plt.plot(x, sharp, label=f"Actual - {MC_SAMPLES} MC samples")
-        plt.plot(x, sharp_apx1, label="Maclaurin - degree 4")
-        plt.plot(x, sharp_apx2, label="Probit")
-        plt.xlabel("Step (Moving Avg)")
-        plt.ylabel("Sharpness")
-        plt.legend()
-        plt.title(f"MNIST, (w: {args.mlp_hidden_dim}, d: {args.mlp_num_layers}), SGD 0.05, SIGMA {sigma}, B 256, LOSS {LOSS_THRESH}")
-        plt.savefig(osp.join(args.out_dir, f"sharpness_sigma{sigma}.png"))
-        plt.clf()
+    for j, width in enumerate(WIDTHS):
+        args.cnn_initial_width = width
+        args.j = j
+        
+        main(args, OverfitCNN, callbacks=callbacks)
+
+    plt.plot(WIDTHS, 1-np.asarray(ACCS))
+    plt.xlabel("CNN Width Parameter")
+    plt.ylabel("Test Error")
+    plt.legend()
+    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.cnn_num_layers} layer CNN, SGD 0.05, B 256, LOSS {LOSS_THRESH}")
+    plt.savefig(osp.join(args.out_dir, f"overfit.png"))
+    plt.clf()
 
 
 if __name__ == "__main__":
