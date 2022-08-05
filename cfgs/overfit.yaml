@@ -5,7 +5,7 @@ classes: 10
 cnn_initial_width: 16
 cnn_input_dim: 3
 cnn_kernel_size: 3
-cnn_num_layers: 3
+cnn_num_layers: 4
 data_dir: data
 dataset: cifar10
 dropout_prob: 0
