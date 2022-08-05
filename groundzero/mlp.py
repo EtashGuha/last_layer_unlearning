@@ -3,11 +3,14 @@ from torch import nn
 from groundzero.model import Model
 
 
+def relu():
+    return nn.ReLU(inplace=True)
+
 class MLP(Model):
     def __init__(self, args, classes):
         super().__init__(args, classes)
         
-        activations = {"relu": nn.ReLU, "sigmoid": nn.Sigmoid}
+        activations = {"relu": relu, "sigmoid": nn.Sigmoid}
         activation = activations[args.mlp_activation]
 
         self.model = nn.Sequential()
