@@ -80,19 +80,17 @@ def main(args, model_class, callbacks=None):
 
     model = load_model(args, model_class, args.classes)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
+    
+    datasets = {"cifar10": load_cifar10, "mnist": load_mnist}
 
-    if args.dataset == "cifar10":
-        dm = load_cifar10(args)
-    elif args.dataset == "mnist":
-        dm = load_mnist(args)
+    dm = datasets[args.dataset](args)
         
     trainer.fit(model, datamodule=dm)
        
 
 if __name__ == "__main__":
     args = parse_args()
+    
+    archs = {"cnn": CNN, "mlp": MLP, "resnet": ResNet}
 
-    if args.arch == "mlp":
-        main(args, MLP)
-    elif args.arch == "resnet":
-        main(args, ResNet)
+    main(args, archs[args.arch])
