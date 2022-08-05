@@ -17,9 +17,7 @@ class ResNet(Model):
         }
 
         self.model = resnets[args.resnet_version](pretrained=args.resnet_pretrained)
-
-        if args.dataset == "mnist":
-            self.model.conv1 = nn.Conv2d(1, 64, kernel_size=7)
+        self.model.conv1 = nn.Conv2d(args.cnn_input_dim, 64, kernel_size=7)
 
         self.model.fc = nn.Sequential(
             nn.Dropout(p=args.dropout_prob),
