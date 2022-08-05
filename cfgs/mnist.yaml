@@ -1,5 +1,6 @@
 arch: resnet
 batch_size: 256
+bias: True
 classes: 10
 cnn_initial_width: 16
 cnn_kernel_size: 3
@@ -13,7 +14,6 @@ lr_drop: 0.1
 lr_steps: []
 max_epochs: 20
 mlp_activation: relu
-mlp_bias: True
 mlp_hidden_dim: 256
 mlp_input_dim: 784
 mlp_num_layers: 3
