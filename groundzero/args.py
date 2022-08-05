@@ -15,7 +15,7 @@ def parse_args():
     return args
 
 def add_input_args(parser):
-    parser.add("--arch", choices=["mlp", "resnet"])
+    parser.add("--arch", choices=["cnn", "mlp", "resnet"])
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--classes", type=int)
@@ -41,7 +41,6 @@ def add_input_args(parser):
     parser.add("--resume_training", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--resume_weights", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--train_fc_only", default=False, type=lambda x: (str(x).lower() == 'true'))
-    parser.add("--val_split", type=float)
     parser.add("--weights")
     parser.add("--weight_decay", type=float)
     parser.add("--workers", type=int)
