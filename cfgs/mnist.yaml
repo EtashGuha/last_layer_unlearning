@@ -1,6 +1,9 @@
 arch: resnet
 batch_size: 256
 classes: 10
+cnn_initial_width: 16
+cnn_kernel_size: 3
+cnn_num_layers: 3
 data_dir: data
 dataset: mnist
 dropout_prob: 0.5
