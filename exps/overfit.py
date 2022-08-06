@@ -8,36 +8,31 @@ from groundzero.args import parse_args
 from groundzero.cnn import CNN
 from groundzero.main import main
 
-LOSS_THRESH = 0.1
 TRAIN_PROPORTION = 0.1
-WIDTHS = [16, 32, 64]
+DEPTHS = [2, 4]
+WIDTHS = [32, 64, 128]
 
 
 def experiment(args):
-    callbacks = [
-        EarlyStopping(
-            monitor="train_loss",
-            patience=1000,
-            stopping_threshold=LOSS_THRESH,
-        ),
-    ]
-    
     args.limit_train_batches = TRAIN_PROPORTION
-    args.check_val_every_n_epoch = int(1 / TRAIN_PROPORTION)
     
     accs = []
-    for j, width in enumerate(WIDTHS):
-        args.cnn_initial_width = width
-        args.j = j
+    for depth in DEPTHS:
+        a = []
+        for width in WIDTHS:
+            args.cnn_initial_width = width
         
-        result = main(args, CNN, callbacks=callbacks)
-        accs.append(result["acc1"])
+            result = main(args, CNN, callbacks=callbacks)
+            a.append(result[0]["acc1"])
+        accs.append(a)
 
-    plt.plot(WIDTHS, 1-np.asarray(accs))
+    accs = 1 - np.asarray(accs)
+    plt.plot(WIDTHS, accs[0], label="3 layer CNN")
+    plt.plot(WIDTHS, accs[1], label="5 layer CNN")
     plt.xlabel("CNN Width Parameter")
     plt.ylabel("Test Error")
     plt.legend()
-    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.cnn_num_layers} layer CNN, SGD 0.05, B 256, LOSS {LOSS_THRESH}")
+    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
 
