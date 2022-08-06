@@ -9,7 +9,7 @@ from groundzero.main import main
 
 TRAIN_PROPORTION = 0.1
 DEPTHS = [2, 4]
-WIDTHS = [32, 64, 128]
+WIDTHS = [16, 32, 64, 128]
 
 
 def experiment(args):
@@ -29,6 +29,7 @@ def experiment(args):
     plt.plot(WIDTHS, accs[0], label="3 layer CNN")
     plt.plot(WIDTHS, accs[1], label="5 layer CNN")
     plt.xlabel("CNN Width Parameter")
+    plt.xscale("log", base=2) 
     plt.ylabel("Test Error")
     plt.legend()
     plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
