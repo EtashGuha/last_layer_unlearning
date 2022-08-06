@@ -8,30 +8,16 @@ from groundzero.args import parse_args
 from groundzero.cnn import CNN
 from groundzero.main import main
 
-ACCS = [0, 0, 0]
-LOSS_THRESH = 0.01
+LOSS_THRESH = 0.1
 TRAIN_PROPORTION = 0.1
 WIDTHS = [16, 32, 64]
 
 
-class OverfitCNN(CNN):
-    def __init__(self, args, classes):
-        super().__init__(args, classes)
-        
-        self.j = args.j
-    
-    def validation_epoch_end(self, validation_step_outputs):
-        super().validation_epoch_end(validation_step_outputs)
-        
-        ACCS[self.j] = self.val_acc1
-
 def experiment(args):
-    global ACCS
-    
     callbacks = [
         EarlyStopping(
             monitor="train_loss",
-            patience=100,
+            patience=1000,
             stopping_threshold=LOSS_THRESH,
         ),
     ]
@@ -39,13 +25,15 @@ def experiment(args):
     args.limit_train_batches = TRAIN_PROPORTION
     args.check_val_every_n_epoch = int(1 / TRAIN_PROPORTION)
     
+    accs = []
     for j, width in enumerate(WIDTHS):
         args.cnn_initial_width = width
         args.j = j
         
-        main(args, OverfitCNN, callbacks=callbacks)
+        result = main(args, CNN, callbacks=callbacks)
+        accs.append(result["acc1"])
 
-    plt.plot(WIDTHS, 1-np.asarray(ACCS))
+    plt.plot(WIDTHS, 1-np.asarray(accs))
     plt.xlabel("CNN Width Parameter")
     plt.ylabel("Test Error")
     plt.legend()
