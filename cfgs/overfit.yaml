@@ -13,7 +13,7 @@ data_dir: data
 dataset: cifar10
 devices: 1
 dropout_prob: 0
-lr: 0.02
+lr: 1e-3
 lr_drop: 0.1
 lr_steps: []
 max_epochs: 10000
