@@ -49,7 +49,7 @@ def load_trainer(args, addtl_callbacks=None):
     )
 
     progress_bar = TQDMProgressBar(refresh_rate=args.refresh_rate)
-    args.strategy = "ddp" if args.gpus > 1 else None
+    args.strategy = "ddp" if args.devices > 1 else None
 
     callbacks = [checkpointer, progress_bar]
     if type(addtl_callbacks) == list:
