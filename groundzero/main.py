@@ -74,24 +74,19 @@ def load_cifar10(args):
             cifar10_normalization(),
         ]
     )
-
+    
+    dm = CIFAR10DataModule(
+        batch_size=args.batch_size,
+        data_dir=args.data_dir,
+        num_workers=args.workers,
+        val_split=args.val_split,
+        
+    )
+    
     if args.data_augmentation:
-        dm = CIFAR10DataModule(
-            batch_size=args.batch_size,
-            data_dir=args.data_dir,
-            num_workers=args.workers,
-            val_split=args.val_split,
-            train_transforms=train_transforms,
-            val_transforms=test_transforms,
-            test_transforms=test_transforms,
-        )
-    else:
-        dm = CIFAR10DataModule(
-            batch_size=args.batch_size,
-            data_dir=args.data_dir,
-            num_workers=args.workers,
-            val_split=args.val_split,
-        )
+        dm.train_transforms = train_transforms
+        dm.val_transforms = test_transforms
+        dm.test_transforms = test_transforms
 
     return dm
 
