@@ -118,6 +118,7 @@ def main(args, model_class, callbacks=None):
     dm = datasets[args.dataset](args)
         
     trainer.fit(model, datamodule=dm)
+    trainer.test(model, datamodule=dm)
        
 
 if __name__ == "__main__":
