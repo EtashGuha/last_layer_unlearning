@@ -7,6 +7,7 @@ cnn_input_dim: 3
 cnn_kernel_size: 3
 cnn_num_layers: 4
 cnn_padding: 1
+data_augmentation: True
 data_dir: data
 dataset: cifar10
 dropout_prob: 0
