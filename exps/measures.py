@@ -108,6 +108,7 @@ def experiment(args):
     callbacks = [
         EarlyStopping(
             monitor="train_loss",
+            patience=100,
             stopping_threshold=0.01,
         ),
     ]
