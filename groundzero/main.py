@@ -29,13 +29,15 @@ def load_model(args, model_class, classes):
             model.load_state_dict(state_dict, strict=False)
             print(f"Weights loaded from {args.weights}.")
     else:
-        if args.arch == "resnet":
+        if args.arch == "cnn":
+            print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
+        elif args.arch == "mlp":
+            print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
+        elif args.arch == "resnet":
             if args.resnet_pretrained:
                 print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
             else:
                 print(f"Loading ResNet{args.resnet_version} with no pretraining.")
-        elif args.arch == "mlp":
-            print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
 
     return model
 
@@ -57,11 +59,37 @@ def load_trainer(args, addtl_callbacks=None):
     return trainer
 
 def load_cifar10(args):
-    dm = CIFAR10DataModule(
-        batch_size=args.batch_size,
-        data_dir=args.data_dir,
-        num_workers=args.workers,
+    train_transforms = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.RandomCrop(32, padding=4),
+            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.ToTensor(),
+            cifar10_normalization(),
+        ]
     )
+
+    test_transforms = torchvision.transforms.Compose(
+        [
+            torchvision.transforms.ToTensor(),
+            cifar10_normalization(),
+        ]
+    )
+
+    if args.data_augmentation:
+        dm = CIFAR10DataModule(
+            batch_size=args.batch_size,
+            data_dir=args.data_dir,
+            num_workers=args.workers,
+            train_transforms=train_transforms,
+            val_transforms=test_transforms,
+            test_transforms=test_transforms,
+        )
+    else:
+        dm = CIFAR10DataModule(
+            batch_size=args.batch_size,
+            data_dir=args.data_dir,
+            num_workers=args.workers,
+        )
 
     return dm
 
