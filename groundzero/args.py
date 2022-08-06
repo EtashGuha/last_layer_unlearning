@@ -44,6 +44,7 @@ def add_input_args(parser):
     parser.add("--resume_training", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--resume_weights", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--train_fc_only", default=False, type=lambda x: (str(x).lower() == 'true'))
+    parser.add("--val_split", type=float)
     parser.add("--weights")
     parser.add("--weight_decay", type=float)
     parser.add("--workers", type=int)
