@@ -60,17 +60,10 @@ def load_trainer(args, addtl_callbacks=None):
     return trainer
 
 def load_cifar10(args):
-    train_transforms = Compose(
+    transforms = Compose(
         [
             RandomCrop(32, padding=4),
             RandomHorizontalFlip(),
-            ToTensor(),
-            cifar10_normalization(),
-        ]
-    )
-
-    test_transforms = Compose(
-        [
             ToTensor(),
             cifar10_normalization(),
         ]
@@ -85,9 +78,7 @@ def load_cifar10(args):
     )
     
     if args.data_augmentation:
-        dm.train_transforms = train_transforms
-        dm.val_transforms = test_transforms
-        dm.test_transforms = test_transforms
+        dm.transforms = transforms
 
     return dm
 
