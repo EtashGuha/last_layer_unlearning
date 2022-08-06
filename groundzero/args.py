@@ -24,6 +24,7 @@ def add_input_args(parser):
     parser.add("--cnn_kernel_size", type=int)
     parser.add("--cnn_num_layers", type=int)
     parser.add("--cnn_padding", type=int)
+    parser.add("--data_augmentation", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--data_dir")
     parser.add("--dataset", choices=["cifar10", "mnist"])
     parser.add("--dropout_prob", type=float)
