@@ -37,7 +37,7 @@ def experiment(args):
     ]
     
     args.limit_train_batches = TRAIN_PROPORTION
-    args.check_val_every_n_epoch = 1 / TRAIN_PROPORTION
+    args.check_val_every_n_epoch = int(1 / TRAIN_PROPORTION)
     
     for j, width in enumerate(WIDTHS):
         args.cnn_initial_width = width
