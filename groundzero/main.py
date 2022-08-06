@@ -78,7 +78,7 @@ def load_cifar10(args):
     )
     
     if args.data_augmentation:
-        dm.transforms = transforms
+        dm.train_transforms = transforms
 
     return dm
 
