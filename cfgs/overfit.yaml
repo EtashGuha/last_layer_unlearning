@@ -29,6 +29,7 @@ resnet_version: 50
 resume_training: False
 resume_weights: False
 train_fc_only: False
+val_split: 0
 weights: ""
 weight_decay: 1e-4
 workers: 4
