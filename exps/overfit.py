@@ -23,7 +23,7 @@ def experiment(args):
         for width in WIDTHS:
             args.cnn_initial_width = width
             result = main(args, CNN)
-            a.append(result[0]["acc1"])
+            a.append(result[0]["test_acc1"])
         accs.append(a)
 
     accs = 1 - np.asarray(accs)
