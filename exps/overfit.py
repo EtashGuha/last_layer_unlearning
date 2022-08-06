@@ -2,7 +2,6 @@ import os.path as osp
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 
 from groundzero.args import parse_args
 from groundzero.cnn import CNN
@@ -32,7 +31,7 @@ def experiment(args):
     plt.xlabel("CNN Width Parameter")
     plt.ylabel("Test Error")
     plt.legend()
-    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.epochs} epochs")
+    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
 
