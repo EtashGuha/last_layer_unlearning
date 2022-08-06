@@ -80,6 +80,7 @@ def load_cifar10(args):
             batch_size=args.batch_size,
             data_dir=args.data_dir,
             num_workers=args.workers,
+            val_split=args.val_split,
             train_transforms=train_transforms,
             val_transforms=test_transforms,
             test_transforms=test_transforms,
@@ -89,6 +90,7 @@ def load_cifar10(args):
             batch_size=args.batch_size,
             data_dir=args.data_dir,
             num_workers=args.workers,
+            val_split=args.val_split,
         )
 
     return dm
@@ -99,6 +101,7 @@ def load_mnist(args):
         data_dir=args.data_dir,
         normalize=True,
         num_workers=args.workers,
+        val_split=args.val_split,
     )
 
     return dm
