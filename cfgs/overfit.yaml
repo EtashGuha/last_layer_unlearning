@@ -15,7 +15,7 @@ dropout_prob: 0
 lr: 0.02
 lr_drop: 0.1
 lr_steps: []
-max_epochs: 1000
+max_epochs: 10000
 mlp_activation: relu
 mlp_hidden_dim: 256
 mlp_input_dim: 3072
