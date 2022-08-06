@@ -11,8 +11,8 @@ cnn_padding: 1
 data_augmentation: True
 data_dir: data
 dataset: cifar10
-devices: 1
 dropout_prob: 0
+gpus: 1
 lr: 1e-3
 lr_drop: 0.1
 lr_steps: []
