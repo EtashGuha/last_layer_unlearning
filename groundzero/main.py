@@ -59,18 +59,18 @@ def load_trainer(args, addtl_callbacks=None):
     return trainer
 
 def load_cifar10(args):
-    train_transforms = torchvision.transforms.Compose(
+    train_transforms = Compose(
         [
-            torchvision.transforms.RandomCrop(32, padding=4),
-            torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.ToTensor(),
+            RandomCrop(32, padding=4),
+            RandomHorizontalFlip(),
+            ToTensor(),
             cifar10_normalization(),
         ]
     )
 
-    test_transforms = torchvision.transforms.Compose(
+    test_transforms = Compose(
         [
-            torchvision.transforms.ToTensor(),
+            ToTensor(),
             cifar10_normalization(),
         ]
     )
