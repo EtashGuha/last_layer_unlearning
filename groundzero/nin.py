@@ -19,7 +19,7 @@ class NiN(Model):
             self.model.append(nn.ReLU(inplace=True))
             self.model.append(nn.Conv2d(k, k, 1, bias=args.bias, padding=args.nin_padding))
             self.model.append(nn.ReLU(inplace=True))
-            self.model.append(nn.Dropout(args.dropout_prob)
+            self.model.append(nn.Dropout(args.dropout_prob))
                               
         # Max pooling?
         
