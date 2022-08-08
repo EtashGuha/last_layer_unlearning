@@ -4,35 +4,32 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from groundzero.args import parse_args
-from groundzero.nin import NiN
+from groundzero.cnn import CNN
 from groundzero.main import main
 
-TRAIN_PROPORTION = 0.1
 DEPTHS = [2, 4]
-WIDTHS = [96 * 1, 96 * 2, 96 * 3, 96 * 4]
+WIDTHS = [32, 64, 128, 256]
 
 
 def experiment(args):
-    args.limit_train_batches = TRAIN_PROPORTION
-    
     accs = []
     for depth in DEPTHS:
         a = []
-        args.nin_num_layers = depth
+        args.cnn_num_layers = depth
         for width in WIDTHS:
-            args.nin_width = width
-            result = main(args, NiN)
+            args.cnn_initial_width = width
+            result = main(args, CNN)
             a.append(result[0]["test_acc1"])
         accs.append(a)
 
     accs = 1 - np.asarray(accs)
-    plt.plot(WIDTHS, accs[0], label="3 layer NiN")
-    plt.plot(WIDTHS, accs[1], label="5 layer NiN")
-    plt.xlabel("NiN Width Parameter")
-    plt.xscale("log", base=96) 
+    plt.plot(WIDTHS, accs[0], label="2 layer CNN")
+    plt.plot(WIDTHS, accs[1], label="4 layer CNN")
+    plt.xlabel("CNN Width Parameter")
+    plt.xscale("log", base=2) 
     plt.ylabel("Test Error")
     plt.legend()
-    plt.title(f"Subsampled {TRAIN_PROPORTION} CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
+    plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
 
