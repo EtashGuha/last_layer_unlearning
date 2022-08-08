@@ -36,6 +36,7 @@ def add_input_args(parser):
     parser.add("--mlp_input_dim", type=int)
     parser.add("--mlp_num_layers", type=int)
     parser.add("--momentum", type=float)
+    parser.add("--nin_input_dim", type=int)
     parser.add("--nin_num_layers", type=int)
     parser.add("--nin_padding", type=int)
     parser.add("--nin_width", type=int)
