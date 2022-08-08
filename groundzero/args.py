@@ -15,7 +15,7 @@ def parse_args():
     return args
 
 def add_input_args(parser):
-    parser.add("--arch", choices=["cnn", "mlp", "resnet"])
+    parser.add("--arch", choices=["cnn", "mlp", "nin", "resnet"])
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--classes", type=int)
