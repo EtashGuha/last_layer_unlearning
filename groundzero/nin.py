@@ -19,11 +19,10 @@ class NiN(Model):
             self.model.append(nn.ReLU(inplace=True))
             self.model.append(nn.Conv2d(k, k, 1, bias=args.bias, padding=args.nin_padding))
             self.model.append(nn.ReLU(inplace=True))
+            self.model.append(nn.MaxPool2d(3, stride=2))
             self.model.append(nn.Dropout(args.dropout_prob))
-                              
-        # Max pooling?
         
-        self.model.append(nn.LazyConv2d(args.classes, 1, bias=args.bias, padding=args.nin_padding))
+        self.model.append(nn.Conv2d(k, args.classes, 1, bias=args.bias, padding=args.nin_padding))
         self.model.append(nn.AdaptiveAvgPool2d((1, 1)))
         self.model.append(nn.Flatten())
     
