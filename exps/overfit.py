@@ -18,9 +18,9 @@ def experiment(args):
     accs = []
     for depth in DEPTHS:
         a = []
-        args.cnn_num_layers = depth
+        args.nin_num_layers = depth
         for width in WIDTHS:
-            args.cnn_initial_width = width
+            args.nin_width = width
             result = main(args, NiN)
             a.append(result[0]["test_acc1"])
         accs.append(a)
