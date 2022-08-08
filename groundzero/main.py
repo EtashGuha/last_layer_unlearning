@@ -16,9 +16,7 @@ from groundzero.mlp import MLP
 from groundzero.resnet import ResNet
 
 
-def load_model(args, model_class, classes):
-    
-    
+def load_model(args, model_class):
     if isinstance(model_class, CNN):
         print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
     elif isinstance(model_class, MLP):
@@ -33,7 +31,7 @@ def load_model(args, model_class, classes):
     else:
         print(f"Loading custom {model_class}.")
         
-    model = model_class(args, classes=classes)
+    model = model_class(args, classes=args.classes)
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
@@ -49,9 +47,11 @@ def load_model(args, model_class, classes):
     return model
 
 def load_trainer(args, addtl_callbacks=None):
+    monitor = "val_loss" if args.val_split else "train_loss"
+    
     checkpointer = ModelCheckpoint(
         filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
-        monitor="val_loss",
+        monitor=monitor,
         save_last=True,
     )
 
@@ -103,7 +103,7 @@ def main(args, model_class, callbacks=None):
     seed_everything(seed=42, workers=True)
     os.makedirs(args.out_dir, exist_ok=True)
 
-    model = load_model(args, model_class, args.classes)
+    model = load_model(args, model_class)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
     
     datasets = {"cifar10": load_cifar10, "mnist": load_mnist}
