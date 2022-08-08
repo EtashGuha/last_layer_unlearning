@@ -17,13 +17,13 @@ from groundzero.resnet import ResNet
 
 
 def load_model(args, model_class):
-    if isinstance(model_class, CNN):
+    if issubclass(model_class, CNN):
         print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
-    elif isinstance(model_class, MLP):
+    elif issubclass(model_class, MLP):
         print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
-    elif isinstance(model_class, NiN):
+    elif issubclass(model_class, NiN):
         print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
-    elif isinstance(model_class, ResNet):
+    elif issubclass(model_class, ResNet):
         if args.resnet_pretrained:
             print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
         else:
