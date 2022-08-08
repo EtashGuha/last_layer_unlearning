@@ -21,6 +21,21 @@ ARCHS = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
 def load_model(args, model_class, classes):
     model = model_class(args, classes=classes)
     
+    mc = type(model_class)
+    if mc not in ARCHS.values():
+        print(f"Loading custom {mc}.")
+    elif mc == CNN:
+        print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
+    elif mc == MLP:
+        print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
+    elif mc == NiN:
+        print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
+    elif mc == ResNet:
+        if args.resnet_pretrained:
+            print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
+        else:
+            print(f"Loading ResNet{args.resnet_version} with no pretraining.")
+    
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
         state_dict = checkpoint["model"]
@@ -30,22 +45,7 @@ def load_model(args, model_class, classes):
             print(f"Resuming training state from {args.weights}.")
         else:
             model.load_state_dict(state_dict, strict=False)
-            print(f"Weights loaded from {args.weights}.")
-    else:
-        mc = type(model_class)
-        if mc not in ARCHS.values():
-            print(f"Loading custom {mc}.")
-        elif mc == CNN:
-            print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
-        elif mc == MLP:
-            print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
-        elif mc == NiN:
-            print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
-        elif mc == ResNet:
-            if args.resnet_pretrained:
-                print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
-            else:
-                print(f"Loading ResNet{args.resnet_version} with no pretraining.")
+            print(f"Weights loaded from {args.weights}.")     
 
     return model
 
