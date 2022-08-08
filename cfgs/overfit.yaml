@@ -37,5 +37,5 @@ resume_weights: False
 train_fc_only: False
 val_split: 0
 weights: ""
-weight_decay: 1e-4
+weight_decay: 0
 workers: 4
