@@ -11,8 +11,9 @@ from pytorch_lightning.utilities.seed import seed_everything
 
 from groundzero.args import parse_args
 from groundzero.cnn import CNN
-from groundzero.resnet import ResNet
+from groundzero.nin import NiN
 from groundzero.mlp import MLP
+from groundzero.resnet import ResNet
 
 
 def load_model(args, model_class, classes):
@@ -33,6 +34,8 @@ def load_model(args, model_class, classes):
             print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
         elif args.arch == "mlp":
             print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
+        elif args.arch == "nin":
+            print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
         elif args.arch == "resnet":
             if args.resnet_pretrained:
                 print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
@@ -110,6 +113,6 @@ def main(args, model_class, callbacks=None):
 if __name__ == "__main__":
     args = parse_args()
     
-    archs = {"cnn": CNN, "mlp": MLP, "resnet": ResNet}
+    archs = {"cnn": CNN, "mlp": MLP, "nin", NiN, "resnet": ResNet}
 
     main(args, archs[args.arch])
