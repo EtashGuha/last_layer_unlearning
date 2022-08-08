@@ -22,6 +22,7 @@ mlp_hidden_dim: 256
 mlp_input_dim: 3072
 mlp_num_layers: 3
 momentum: 0.9
+nin_input_dim: 3
 nin_num_layers: 2
 nin_padding: 1
 nin_width: 192
