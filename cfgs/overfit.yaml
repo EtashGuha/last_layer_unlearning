@@ -17,7 +17,7 @@ gpus: 1
 lr: 1e-3
 lr_drop: 0.1
 lr_steps: []
-max_epochs: 100
+max_epochs: 200
 mlp_activation: relu
 mlp_hidden_dim: 256
 mlp_input_dim: 3072
