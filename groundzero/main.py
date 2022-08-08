@@ -17,7 +17,7 @@ from groundzero.resnet import ResNet
 
 
 def load_model(args, model_class, classes):
-    model = model_class(args, classes=classes)
+    
     
     if isinstance(model_class, CNN):
         print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
@@ -31,7 +31,9 @@ def load_model(args, model_class, classes):
         else:
             print(f"Loading ResNet{args.resnet_version} with no pretraining.")
     else:
-        print(f"Loading custom {model_class}").
+        print(f"Loading custom {model_class}.")
+        
+    model = model_class(args, classes=classes)
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
