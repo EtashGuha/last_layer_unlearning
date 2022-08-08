@@ -15,26 +15,23 @@ from groundzero.nin import NiN
 from groundzero.mlp import MLP
 from groundzero.resnet import ResNet
 
-ARCHS = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
-
 
 def load_model(args, model_class, classes):
     model = model_class(args, classes=classes)
     
-    mc = type(model_class)
-    if mc not in ARCHS.values():
-        print(f"Loading custom {mc}.")
-    elif mc == CNN:
+    if isinstance(model_class, CNN):
         print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
-    elif mc == MLP:
+    elif isinstance(model_class, MLP):
         print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
-    elif mc == NiN:
+    elif isinstance(model_class, NiN):
         print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
-    elif mc == ResNet:
+    elif isinstance(model_class, ResNet):
         if args.resnet_pretrained:
             print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
         else:
             print(f"Loading ResNet{args.resnet_version} with no pretraining.")
+    else:
+        print(f"Loading custom {model_class}").
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
@@ -117,5 +114,7 @@ def main(args, model_class, callbacks=None):
 
 if __name__ == "__main__":
     args = parse_args()
+    
+    archs = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
 
-    main(args, ARCHS[args.arch])
+    main(args, archs[args.arch])
