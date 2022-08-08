@@ -113,6 +113,6 @@ def main(args, model_class, callbacks=None):
 if __name__ == "__main__":
     args = parse_args()
     
-    archs = {"cnn": CNN, "mlp": MLP, "nin", NiN, "resnet": ResNet}
+    archs = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
 
     main(args, archs[args.arch])
