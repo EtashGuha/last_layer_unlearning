@@ -15,6 +15,8 @@ from groundzero.nin import NiN
 from groundzero.mlp import MLP
 from groundzero.resnet import ResNet
 
+ARCHS = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
+
 
 def load_model(args, model_class, classes):
     model = model_class(args, classes=classes)
@@ -30,6 +32,8 @@ def load_model(args, model_class, classes):
             model.load_state_dict(state_dict, strict=False)
             print(f"Weights loaded from {args.weights}.")
     else:
+        if type(model_class) not in ARCHS.values():
+            print(f"Loading custom {type(model_class)}").
         if args.arch == "cnn":
             print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
         elif args.arch == "mlp":
@@ -112,7 +116,5 @@ def main(args, model_class, callbacks=None):
 
 if __name__ == "__main__":
     args = parse_args()
-    
-    archs = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
 
-    main(args, archs[args.arch])
+    main(args, ARCHS[args.arch])
