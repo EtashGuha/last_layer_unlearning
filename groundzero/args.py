@@ -19,6 +19,7 @@ def add_input_args(parser):
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--classes", type=int)
+    parser.add("--cnn_batchnorm", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--cnn_initial_width", type=int)
     parser.add("--cnn_input_dim", type=int)
     parser.add("--cnn_kernel_size", type=int)
