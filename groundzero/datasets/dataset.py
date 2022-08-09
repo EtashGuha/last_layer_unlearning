@@ -1,7 +1,7 @@
 from abc import abstractmethod
 import random
 
-from torch import randperm
+from torch import Generator, randperm
 
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
@@ -65,7 +65,7 @@ class Dataset(VisionDataModule):
             dataset_train = self.dataset_class(self.data_dir, train=True, transform=train_transforms)
             dataset_val = self.dataset_class(self.data_dir, train=True, transform=val_transforms)
 
-            gen = torch.Generator().manual_seed(self.seed)
+            gen = Generator().manual_seed(self.seed)
             train_indices = randperm(sum(lengths), generator=gen).tolist()[:self._get_splits[0]]
             if self.label_noise:
                 num_labels = len(train_indices)
