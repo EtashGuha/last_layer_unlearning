@@ -2,6 +2,8 @@ from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
 from torchvision.datasets import CIFAR10
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
 
+from groundzero.datasets.dataset import Dataset
+
 
 class CIFAR10(Dataset):
     dataset_class = CIFAR10
