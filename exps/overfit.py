@@ -14,7 +14,7 @@ from groundzero.main import main
 from groundzero.models.cnn import CNN
 from groundzero.utils import to_np
 
-TRAIN_ACC1 = 0
+TRAIN_ACC1 = [0]
 WIDTHS = [2, 4, 6, 8, 10]
 
 
@@ -24,7 +24,7 @@ class OverfitCNN(CNN):
     
     def training_epoch_end(self, training_step_outputs):
         super().training_epoch_end(training_step_outputs)
-        TRAIN_ACC1 = self.train_acc1
+        TRAIN_ACC1[0] = self.train_acc1
     
     def test_epoch_end(self, test_step_outputs):
         super().test_epoch_end(test_step_outputs)
@@ -35,7 +35,7 @@ class OverfitCNN(CNN):
                 transforms = fft2(layer.weight)
                 svs = svdvals(transforms)
                 top_svs.append(torch.max(svs).item())
-            if isinstance(layer, Linear):
+            elif isinstance(layer, Linear):
                 svs = svdvals(layer.weight)
                 top_svs.append(torch.max(svs).item())
         
@@ -51,7 +51,7 @@ def experiment(args):
     for width in WIDTHS:
         args.cnn_initial_width = width
         result = main(args, OverfitCNN, CIFAR10)
-        train_accs.append(TRAIN_ACC1)
+        train_accs.append(TRAIN_ACC1[0])
         test_accs.append(result[0]["test_acc1"])
         norms.append(result[0]["prod_spec"])
 
@@ -60,18 +60,17 @@ def experiment(args):
     print(norms)
 
     gaps = (1 - np.asarray(test_accs)) - (1 - np.asarray(train_accs))
+    
     plt.plot(WIDTHS, gaps)
     plt.xlabel("CNN Width Parameter")
-    plt.ylabel("Test Error")
-    plt.legend()
+    plt.ylabel("Generalization Gap")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
 
     plt.plot(norms, gaps)
     plt.xlabel("Product of Conv2D Spectral Norms")
-    plt.ylabel("Test Error")
-    plt.legend()
+    plt.ylabel("Generalization Gap")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit2.png"))
     plt.clf()
