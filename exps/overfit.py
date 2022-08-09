@@ -3,7 +3,7 @@ import os.path as osp
 import torch
 from torch.fft import fft2
 from torch.linalg import svdvals
-from torch.nn import Conv2d
+from torch.nn import Conv2d, Linear
 
 import matplotlib.pyplot as plt
 import numpy as np
