@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -11,11 +13,10 @@ from groundzero.utils import compute_accuracy
 
 
 class Model(pl.LightningModule):
-    def __init__(self, args, classes):
+    def __init__(self, args):
         super().__init__()
 
         self.save_hyperparameters(args)
-        self.classes = classes
         self.train_acc1 = 0
         self.val_acc1 = 0
 
@@ -23,12 +24,9 @@ class Model(pl.LightningModule):
         self.optimizer = optimizers[args.optimizer]
 
         self.model = None
-    
-    def __name__(self):
-        raise NotImplementedError()
-        
+
+    @abstractmethod
     def load_msg(self):
-        raise NotImplementedError()
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -104,3 +102,4 @@ class Model(pl.LightningModule):
 
     def predict_step(self, batch, batch_idx, dataloader_idx):
         return NotImplementedError
+

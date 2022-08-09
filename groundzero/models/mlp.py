@@ -1,14 +1,14 @@
 from torch import nn
 
-from groundzero.model import Model
+from groundzero.models.model import Model
 
 
 def relu():
     return nn.ReLU(inplace=True)
 
 class MLP(Model):
-    def __init__(self, args, classes):
-        super().__init__(args, classes)
+    def __init__(self, args):
+        super().__init__(args)
         
         activations = {"relu": relu, "sigmoid": nn.Sigmoid}
         activation = activations[args.mlp_activation]
@@ -17,7 +17,7 @@ class MLP(Model):
         
         h = [args.mlp_hidden_dim] * (args.mlp_num_layers - 1)
 
-        shapes = zip([args.input_dim] + h, h + [args.classes])
+        shapes = zip([args.input_dim] + h, h + [args.num_classes])
         for i, (n, k) in enumerate(shapes):
             if i == args.mlp_num_layers - 1:
                 self.model.append(nn.Linear(n, k, bias=args.bias))
@@ -32,8 +32,12 @@ class MLP(Model):
             for p in self.model[-1].parameters():
                 p.requires_grad = True
 
+    def load_msg(self):
+        return f"Loading MLP with {self.hparams.mlp_num_layers} layers and hidden dimension {self.hparams.mlp_hidden_dim}."
+
     def forward(self, inputs):
         inputs = inputs.reshape(inputs.shape[0], -1)
         outputs = self.model(inputs)
 
         return outputs
+

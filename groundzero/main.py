@@ -1,40 +1,25 @@
 import os
 
 import torch
-from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
 
-from pl_bolts.datamodules import CIFAR10DataModule, MNISTDataModule
-from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProgressBar
+from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
 
 from groundzero.args import parse_args
-from groundzero import models
-from groundzero import datamodules
-from groundzero.cnn import CNN
-from groundzero.nin import NiN
-from groundzero.mlp import MLP
-from groundzero.resnet import ResNet
+import groundzero.datasets
+import groundzero.models
 
+
+def load_dataset(args, dataset_class):
+    dataset = dataset_class(args)
+    print(dataset.load_msg())
+
+    return dataset
 
 def load_model(args, model_class):
-    if issubclass(model_class, CNN):
-        print(f"Loading CNN with {args.cnn_num_layers} layers and initial width {args.cnn_initial_width}.")
-    elif issubclass(model_class, MLP):
-        print(f"Loading MLP with {args.mlp_num_layers} layers and hidden dimension {args.mlp_hidden_dim}.")
-    elif issubclass(model_class, NiN):
-        print(f"Loading NiN with {args.nin_num_layers} layers and width {args.nin_width}.")
-    elif issubclass(model_class, ResNet):
-        if args.resnet_pretrained:
-            print(f"Loading ImageNet1K-pretrained ResNet{args.resnet_version}.")
-        else:
-            print(f"Loading ResNet{args.resnet_version} with no pretraining.")
-    else:
-        print(f"Loading custom {model_class}.")
-        
-    model = model_class(args, classes=args.classes)
-    model.load_msg()
+    model = model_class(args)
+    print(model.load_msg())
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
@@ -73,52 +58,17 @@ def load_trainer(args, addtl_callbacks=None):
 
     return trainer
 
-def load_cifar10(args):
-    transforms = Compose(
-        [
-            RandomCrop(32, padding=4),
-            RandomHorizontalFlip(),
-            ToTensor(),
-            cifar10_normalization(),
-        ]
-    )
-    
-    dm = CIFAR10DataModule(
-        batch_size=args.batch_size,
-        data_dir=args.data_dir,
-        num_workers=args.workers,
-        val_split=args.val_split,
-        
-    )
-    
-    if args.data_augmentation:
-        dm.train_transforms = transforms
-
-    return dm
-
-def load_mnist(args):
-    dm = MNISTDataModule(
-        batch_size=args.batch_size,
-        data_dir=args.data_dir,
-        normalize=True,
-        num_workers=args.workers,
-        val_split=args.val_split,
-    )
-
-    return dm
-
-def load_datamodule(args):
-
-def main(args, model_class, datamodule_class, callbacks=None):
-    seed_everything(seed=42, workers=True)
+def main(args, model_class, dataset_class, callbacks=None):
+    seed_everything(seed=args.seed, workers=True)
     os.makedirs(args.out_dir, exist_ok=True)
 
-    datamodule = load_datamodule(args, datamodule_class)
+    dataset = load_dataset(args, dataset_class)
+    args.num_classes = dataset.num_classes
     model = load_model(args, model_class)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
         
-    trainer.fit(model, datamodule=datamodule)
-    metrics = trainer.test(model, datamodule=datamodule)
+    trainer.fit(model, datamodule=dataset)
+    metrics = trainer.test(model, datamodule=dataset)
     
     return metrics
 
@@ -126,7 +76,10 @@ def main(args, model_class, datamodule_class, callbacks=None):
 if __name__ == "__main__":
     args = parse_args()
     
-    archs = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
-    datasets = {"cifar10": CIFAR10DataModule, "mnist": MNISTDataModule}
+    models = dict([(name, cls) for name, cls in groundzero.models.__dict__.items()
+                   if name in groundzero.models.__all__ and name != "model"])
+    datasets = dict([(name, cls) for name, cls in groundzero.datasets..__dict__.items()
+                     if name in groundzero.datasets.__all__ and name != "dataset"])
 
-    main(args, archs[args.arch], datasets[args.dataset])
+    main(args, models[args.model], datasets[args.dataset])
+
