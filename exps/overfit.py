@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from groundzero.args import parse_args
-from groundzero.cnn import CNN
 from groundzero.main import main
+from groundzero.models.cnn import CNN
 
 DEPTHS = [2, 4]
 WIDTHS = [32, 64, 128, 256]
