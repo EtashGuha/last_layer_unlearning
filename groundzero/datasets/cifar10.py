@@ -10,7 +10,7 @@ class CIFAR10(Dataset):
     num_classes = 10
 
     def __init__(self, args):
-        super.__init__(args)
+        super().__init__(args)
 
     def augmented_transforms(self):
         transforms = Compose([
