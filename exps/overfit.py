@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from groundzero.args import parse_args
+from groundzero.datasets.cifar10 import CIFAR10
 from groundzero.main import main
 from groundzero.models.cnn import CNN
 
@@ -18,7 +19,7 @@ def experiment(args):
         args.cnn_num_layers = depth
         for width in WIDTHS:
             args.cnn_initial_width = width
-            result = main(args, CNN)
+            result = main(args, CNN, CIFAR10)
             a.append(result[0]["test_acc1"])
         accs.append(a)
 
