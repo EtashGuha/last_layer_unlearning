@@ -32,7 +32,7 @@ class OverfitCNN(CNN):
                 top_svs.append(torch.max(svs).item())
         
         test_prod_spec = np.prod(np.asarray(top_svs))
-        self.log("test_prod_spec", test_prod_spec)
+        self.log("prod_spec", test_prod_spec)
             
 def experiment(args):
     accs = []
@@ -41,7 +41,7 @@ def experiment(args):
         args.cnn_initial_width = width
         result = main(args, OverfitCNN, CIFAR10)
         accs.append(result[0]["test_acc1"])
-        norms.append(result[0]["test_prod_spec"])
+        norms.append(result[0]["prod_spec"])
 
     print(accs)
     print(norms)
