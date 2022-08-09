@@ -23,6 +23,12 @@ class Model(pl.LightningModule):
         self.optimizer = optimizers[args.optimizer]
 
         self.model = None
+    
+    def __name__(self):
+        raise NotImplementedError()
+        
+    def load_msg(self):
+        raise NotImplementedError()
 
     def forward(self, inputs):
         return self.model(inputs)
