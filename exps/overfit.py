@@ -3,7 +3,7 @@ import os.path as osp
 
 from torch.fft import fft2
 from torch.linalg import svdvals
-from torch.nn import Conv2D
+from torch.nn import Conv2d
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,8 +25,8 @@ class OverfitCNN(CNN):
         
         top_svs = []
         for layer in self.model:
-            if isinstance(layer, Conv2D):
-                transforms = fft2(Conv2D.weights)
+            if isinstance(layer, Conv2d):
+                transforms = fft2(layer.weights)
                 top_svs.append(svdvals(transforms)[0])
         
         result["test_prod_spec"] = prod(top_svs)
