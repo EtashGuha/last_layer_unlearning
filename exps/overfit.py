@@ -1,5 +1,6 @@
 import os.path as osp
 
+import torch
 from torch.fft import fft2
 from torch.linalg import svdvals
 from torch.nn import Conv2d
@@ -20,19 +21,18 @@ class OverfitCNN(CNN):
     def __init__(self, args):
         super().__init__(args)
         
-    def test_step(self, batch, batch_idx):
-        result = super().test_step(batch, batch_idx)
+    def test_epoch_end(self, test_step_outputs):
+        super().test_epoch_end(test_step_outputs)
         
         top_svs = []
         for layer in self.model:
             if isinstance(layer, Conv2d):
                 transforms = fft2(layer.weight)
-                top_svs.append(svdvals(transforms)[0].item())
+                svs = svdvals(transforms)
+                top_svs.append(torch.max(svs).item())
         
-        result["test_prod_spec"] = np.prod(np.asarray(top_svs))
-        self.log("test_prod_spec", result["test_prod_spec"], on_epoch=True, prog_bar=False, sync_dist=True)
-        
-        return result
+        test_prod_spec = np.prod(np.asarray(top_svs))
+        self.log("test_prod_spec", test_prod_spec)
             
 def experiment(args):
     accs = []
@@ -43,6 +43,9 @@ def experiment(args):
         accs.append(result[0]["test_acc1"])
         norms.append(result[0]["test_prod_spec"])
 
+    print(accs)
+    print(norms)
+
     accs = 1 - np.asarray(accs)
     plt.plot(WIDTHS, accs)
     plt.xlabel("CNN Width Parameter")
@@ -50,6 +53,14 @@ def experiment(args):
     plt.legend()
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
+    plt.clf()
+
+    plt.plot(WIDTHS, norms)
+    plt.xlabel("Product of Conv2D Spectral Norms")
+    plt.ylabel("Test Error")
+    plt.legend()
+    plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
+    plt.savefig(osp.join(args.out_dir, f"overfit2.png"))
     plt.clf()
 
 
