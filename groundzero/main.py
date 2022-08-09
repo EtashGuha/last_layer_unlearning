@@ -10,6 +10,8 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint, TQDMProg
 from pytorch_lightning.utilities.seed import seed_everything
 
 from groundzero.args import parse_args
+from groundzero import models
+from groundzero import datamodules
 from groundzero.cnn import CNN
 from groundzero.nin import NiN
 from groundzero.mlp import MLP
@@ -32,6 +34,7 @@ def load_model(args, model_class):
         print(f"Loading custom {model_class}.")
         
     model = model_class(args, classes=args.classes)
+    model.load_msg()
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
@@ -47,19 +50,24 @@ def load_model(args, model_class):
     return model
 
 def load_trainer(args, addtl_callbacks=None):
-    monitor = "val_loss" if args.val_split else "train_loss"
-    
-    checkpointer = ModelCheckpoint(
-        filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
-        monitor=monitor,
-        save_last=True,
-    )
+    if args.val_split:
+        checkpointer = ModelCheckpoint(
+            filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
+            monitor="val_loss",
+            save_last=True,
+        )
+    else:
+        checkpointer = ModelCheckpoint(
+            filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
+            monitor="train_loss",
+            save_last=True,
+        )
 
     progress_bar = TQDMProgressBar(refresh_rate=args.refresh_rate)
-    args.strategy = "ddp" if args.gpus > 1 else None
+    args.strategy = "ddp" if args.devices > 1 else None
 
     callbacks = [checkpointer, progress_bar]
-    if type(addtl_callbacks) == list:
+    if isinstance(addtl_callbacks, list):
         callbacks.extend(addtl_callbacks)
     trainer = Trainer.from_argparse_args(args, callbacks=callbacks)
 
@@ -99,24 +107,26 @@ def load_mnist(args):
 
     return dm
 
-def main(args, model_class, callbacks=None):
+def load_datamodule(args):
+
+def main(args, model_class, datamodule_class, callbacks=None):
     seed_everything(seed=42, workers=True)
     os.makedirs(args.out_dir, exist_ok=True)
 
+    datamodule = load_datamodule(args, datamodule_class)
     model = load_model(args, model_class)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
-    
-    datasets = {"cifar10": load_cifar10, "mnist": load_mnist}
-
-    dm = datasets[args.dataset](args)
         
-    trainer.fit(model, datamodule=dm)
-    return trainer.test(model, datamodule=dm)
-       
+    trainer.fit(model, datamodule=datamodule)
+    metrics = trainer.test(model, datamodule=datamodule)
+    
+    return metrics
+
 
 if __name__ == "__main__":
     args = parse_args()
     
     archs = {"cnn": CNN, "mlp": MLP, "nin": NiN, "resnet": ResNet}
+    datasets = {"cifar10": CIFAR10DataModule, "mnist": MNISTDataModule}
 
-    main(args, archs[args.arch])
+    main(args, archs[args.arch], datasets[args.dataset])
