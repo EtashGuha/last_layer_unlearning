@@ -31,9 +31,11 @@ class Dataset(VisionDataModule):
 
     @abstractmethod
     def augmented_transforms(self):
+        return
 
     @abstractmethod
     def default_transforms(self):
+        return
  
     def load_msg(self):
         msg = f"Loading {self.__name__} with {int(self.val_split * 100)}% val split."
