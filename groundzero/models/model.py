@@ -27,6 +27,7 @@ class Model(pl.LightningModule):
 
     @abstractmethod
     def load_msg(self):
+        return
 
     def forward(self, inputs):
         return self.model(inputs)
