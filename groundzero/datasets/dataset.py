@@ -7,7 +7,7 @@ from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
 
 class Dataset(VisionDataModule):
-    def __init__(self, args):
+    def __init__(self, args, dataset_class, num_classes):
         super().__init__(
             batch_size=args.batch_size,
             data_dir=args.data_dir,
@@ -20,8 +20,8 @@ class Dataset(VisionDataModule):
             val_split=args.val_split,
         )
 
-        self.dataset_class = None
-        self.num_classes = None
+        self.dataset_class = dataset_class
+        self.num_classes = num_classes
         
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
