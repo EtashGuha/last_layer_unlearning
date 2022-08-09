@@ -1,5 +1,5 @@
 from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10 as TorchvisionCIFAR10
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
 
 from groundzero.datasets.dataset import Dataset
@@ -7,10 +7,7 @@ from groundzero.datasets.dataset import Dataset
 
 class CIFAR10(Dataset):
     def __init__(self, args):
-        super().__init__(args)
-        
-        self.dataset_class = CIFAR10
-        self.num_classes = 10
+        super().__init__(args, TorchvisionCIFAR10, 10)
 
     def augmented_transforms(self):
         transforms = Compose([
@@ -29,4 +26,3 @@ class CIFAR10(Dataset):
         ])
 
         return transforms
-
