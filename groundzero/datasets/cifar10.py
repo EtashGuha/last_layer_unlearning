@@ -6,11 +6,11 @@ from groundzero.datasets.dataset import Dataset
 
 
 class CIFAR10(Dataset):
-    dataset_class = CIFAR10
-    num_classes = 10
-
     def __init__(self, args):
         super().__init__(args)
+        
+        self.dataset_class = CIFAR10
+        self.num_classes = 10
 
     def augmented_transforms(self):
         transforms = Compose([
