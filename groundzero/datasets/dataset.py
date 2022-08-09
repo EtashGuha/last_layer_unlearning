@@ -11,7 +11,7 @@ class Dataset(VisionDataModule):
     num_classes: int
 
     def __init__(self, args):
-        super.__init__(
+        super().__init__(
             batch_size=args.batch_size,
             data_dir=args.data_dir,
             drop_last=False,
