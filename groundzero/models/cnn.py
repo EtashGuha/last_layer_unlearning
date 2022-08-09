@@ -17,7 +17,9 @@ class CNN(Model):
             if args.cnn_batchnorm:
                 self.model.append(nn.BatchNorm2d(k))
             self.model.append(nn.ReLU(inplace=True))
-            self.model.append(nn.MaxPool2d(2))
+            
+            if j != 0:
+                self.model.append(nn.MaxPool2d(2))
         
         self.model.append(nn.MaxPool2d(4))
         self.model.append(nn.Flatten())
