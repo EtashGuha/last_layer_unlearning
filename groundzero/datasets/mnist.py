@@ -5,11 +5,11 @@ from groundzero.datasets.dataset import Dataset
 
 
 class MNIST(Dataset):
-    dataset_class = MNIST
-    num_classes = 10
-
     def __init__(self, args):
         super().__init__(args)
+        
+        self.dataset_class = MNIST
+        self.num_classes = 10
 
     def augmented_transforms(self):
         return self.default_transforms()
