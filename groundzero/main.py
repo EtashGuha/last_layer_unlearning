@@ -42,6 +42,7 @@ def load_trainer(args, addtl_callbacks=None):
             save_last=True,
         )
     else:
+        args.num_sanity_val_steps = 0
         checkpointer = ModelCheckpoint(
             filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
             monitor="train_loss",
