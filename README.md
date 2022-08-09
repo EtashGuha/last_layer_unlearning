@@ -1,5 +1,5 @@
 # Ground Zero
-## Quick and extendable experimentation with vision models
+## Quick and extendable experimentation with vision models for classification
 
 ### Setup
 ```
