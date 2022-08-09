@@ -12,6 +12,7 @@ dataset: cifar10
 devices: 1
 dropout_prob: 0
 input_channels: 3
+label_noise: 0.2
 lr: 1e-3
 lr_drop: 0.1
 lr_steps: []
