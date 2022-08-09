@@ -78,7 +78,7 @@ if __name__ == "__main__":
     
     models = dict([(name, cls) for name, cls in groundzero.models.__dict__.items()
                    if name in groundzero.models.__all__ and name != "model"])
-    datasets = dict([(name, cls) for name, cls in groundzero.datasets..__dict__.items()
+    datasets = dict([(name, cls) for name, cls in groundzero.datasets.__dict__.items()
                      if name in groundzero.datasets.__all__ and name != "dataset"])
 
     main(args, models[args.model], datasets[args.dataset])
