@@ -1,6 +1,8 @@
 from pl_bolts.datasets import MNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
 
+from groundzero.datasets.dataset import Dataset
+
 
 class MNIST(Dataset):
     dataset_class = MNIST
