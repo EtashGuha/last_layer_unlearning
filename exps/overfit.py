@@ -35,6 +35,9 @@ class OverfitCNN(CNN):
                 transforms = fft2(layer.weight)
                 svs = svdvals(transforms)
                 top_svs.append(torch.max(svs).item())
+            if isinstance(layer, Linear):
+                svs = svdvals(layer.weight)
+                top_svs.append(torch.max(svs).item())
         
         test_prod_spec = np.prod(np.asarray(top_svs))
         self.log("prod_spec", test_prod_spec)
