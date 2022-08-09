@@ -1,4 +1,3 @@
-from math import prod
 import os.path as osp
 
 from torch.fft import fft2
@@ -12,6 +11,7 @@ from groundzero.args import parse_args
 from groundzero.datasets.cifar10 import CIFAR10
 from groundzero.main import main
 from groundzero.models.cnn import CNN
+from groundzero.utils import to_np
 
 WIDTHS = [2, 4, 6, 8, 10]
 
@@ -26,10 +26,10 @@ class OverfitCNN(CNN):
         top_svs = []
         for layer in self.model:
             if isinstance(layer, Conv2d):
-                transforms = fft2(layer.weights)
-                top_svs.append(svdvals(transforms)[0])
+                transforms = fft2(layer.weight)
+                top_svs.append(svdvals(transforms)[0].item())
         
-        result["test_prod_spec"] = prod(top_svs)
+        result["test_prod_spec"] = np.prod(np.asarray(top_svs))
         self.log("test_prod_spec", result["test_prod_spec"], on_epoch=True, prog_bar=False, sync_dist=True)
         
         return result
