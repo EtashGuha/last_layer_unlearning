@@ -66,12 +66,12 @@ class Dataset(VisionDataModule):
             dataset_val = self.dataset_class(self.data_dir, train=True, transform=val_transforms)
 
             gen = Generator().manual_seed(self.seed)
-            train_indices = randperm(sum(lengths), generator=gen).tolist()[:self._get_splits[0]]
+            train_indices = randperm(len(dataset_train), generator=gen).tolist()
+            train_indices = train_indices[:self._get_splits(len(dataset_train))[0]]
             if self.label_noise:
                 num_labels = len(train_indices)
                 num_noised_labels = int(self.label_noise * num_labels)
 
-                # Support labels not called "targets"?
                 for i, target in enumerate(train_indices[:num_noised_labels]):
                     labels = [j for j in range(num_classes) if j != i]
                     dataset_train.targets[i] = random.choice(labels)
