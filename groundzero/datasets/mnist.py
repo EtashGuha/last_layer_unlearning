@@ -1,4 +1,4 @@
-from pl_bolts.datasets import MNIST
+from pl_bolts.datasets import MNIST as PLMNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 from groundzero.datasets.dataset import Dataset
@@ -6,10 +6,7 @@ from groundzero.datasets.dataset import Dataset
 
 class MNIST(Dataset):
     def __init__(self, args):
-        super().__init__(args)
-        
-        self.dataset_class = MNIST
-        self.num_classes = 10
+        super().__init__(args, PLMNIST, 10)
 
     def augmented_transforms(self):
         return self.default_transforms()
