@@ -7,11 +7,6 @@ from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
 
 class Dataset(VisionDataModule):
-    # Maybe add dims attribute to auto-set input dims for models.
-    dataset_class: type
-    # Maybe support class indices that are not just [0, num_classes].
-    num_classes: int
-
     def __init__(self, args):
         super().__init__(
             batch_size=args.batch_size,
@@ -25,6 +20,9 @@ class Dataset(VisionDataModule):
             val_split=args.val_split,
         )
 
+        self.dataset_class = None
+        self.num_classes = None
+        
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
         
@@ -73,7 +71,7 @@ class Dataset(VisionDataModule):
                 num_noised_labels = int(self.label_noise * num_labels)
 
                 for i, target in enumerate(train_indices[:num_noised_labels]):
-                    labels = [j for j in range(num_classes) if j != i]
+                    labels = [j for j in range(self.num_classes) if j != i]
                     dataset_train.targets[i] = random.choice(labels)
             
             self.dataset_train = self._split_dataset(dataset_train)
