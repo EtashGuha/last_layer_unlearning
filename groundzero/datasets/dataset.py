@@ -38,12 +38,12 @@ class Dataset(VisionDataModule):
         return
  
     def load_msg(self):
-        msg = f"Loading {self.__name__} with {int(self.val_split * 100)}% val split."
+        msg = f"Loading {type(self).__name__} with {int(self.val_split * 100)}% val split."
 
         if self.data_augmentation:
             msg = msg[:-1] + " and data augmentation."
         if self.label_noise:
-            msg = msg[:-1] + f" and {int(self.label_noise) * 100}% label noise."
+            msg = msg[:-1] + f" and {int(self.label_noise * 100)}% label noise."
 
         return msg
 
