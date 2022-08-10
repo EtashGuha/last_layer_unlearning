@@ -39,8 +39,8 @@ class OverfitCNN(CNN):
                 svs = svdvals(layer.weight)
                 top_svs.append(torch.max(svs).item())
         
-        test_prod_spec = np.prod(np.asarray(top_svs))
-        self.log("prod_spec", test_prod_spec)
+        prod_spec = np.prod(np.asarray(top_svs))
+        self.log("prod_spec", prod_spec)
             
 def experiment(args):
     global TRAIN_ACC1
@@ -59,18 +59,18 @@ def experiment(args):
     print(test_accs)
     print(norms)
 
-    gaps = (1 - np.asarray(test_accs)) - (1 - np.asarray(train_accs))
+    errs = 1 - np.asarray(test_accs)
     
-    plt.plot(WIDTHS, gaps)
+    plt.plot(WIDTHS, errs)
     plt.xlabel("CNN Width Parameter")
-    plt.ylabel("Generalization Gap")
+    plt.ylabel("Test Error")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
 
-    plt.plot(norms, gaps)
+    plt.plot(norms, errs)
     plt.xlabel("Product of Conv2D Spectral Norms")
-    plt.ylabel("Generalization Gap")
+    plt.ylabel("Test Error")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit2.png"))
     plt.clf()
