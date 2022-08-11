@@ -2,7 +2,7 @@ import os.path as osp
 
 import torch
 from torch.fft import fft2
-from torch.linalg import svdvals
+from torch.linalg import norm, svdvals
 from torch.nn import Conv2d, Linear
 
 import matplotlib.pyplot as plt
@@ -30,34 +30,45 @@ class OverfitCNN(CNN):
         super().test_epoch_end(test_step_outputs)
         
         top_svs = []
+        fro = []
         for layer in self.model:
             if isinstance(layer, Conv2d):
-                transforms = fft2(layer.weight)
+                w = layer.weight
+                transforms = fft2(w)
                 svs = svdvals(transforms)
                 top_svs.append(torch.max(svs).item())
+                fro.append(norm(w, ord="fro"))
             elif isinstance(layer, Linear):
+                w = layer.weight
                 svs = svdvals(layer.weight)
                 top_svs.append(torch.max(svs).item())
+                fro.append(norm(w, ord="fro"))
         
         prod_spec = np.prod(np.asarray(top_svs))
         self.log("prod_spec", prod_spec)
+        
+        prod_fro = np.prod(np.asarray(fro))
+        self.log("prod_fro", prod_fro)
             
 def experiment(args):
     global TRAIN_ACC1
     
     train_accs = []
     test_accs = []
-    norms = []
+    spec = []
+    fro = []
     for width in WIDTHS:
         args.cnn_initial_width = width
         result = main(args, OverfitCNN, CIFAR10)
         train_accs.append(TRAIN_ACC1[0])
         test_accs.append(result[0]["test_acc1"])
-        norms.append(result[0]["prod_spec"])
+        spec.append(result[0]["prod_spec"])
+        fro.append(result[0]["prod_fro"])
 
     print(train_accs)
     print(test_accs)
-    print(norms)
+    print(spec)
+    print(fro)
 
     errs = 1 - np.asarray(test_accs)
     
@@ -65,14 +76,21 @@ def experiment(args):
     plt.xlabel("CNN Width Parameter")
     plt.ylabel("Test Error")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
-    plt.savefig(osp.join(args.out_dir, f"overfit.png"))
+    plt.savefig(osp.join(args.out_dir, f"overfit_acc.png"))
     plt.clf()
 
-    plt.plot(norms, errs)
-    plt.xlabel("Product of Conv2D Spectral Norms")
+    plt.plot(spec, errs)
+    plt.xlabel("Product of CNN Spectral Norms")
     plt.ylabel("Test Error")
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
-    plt.savefig(osp.join(args.out_dir, f"overfit2.png"))
+    plt.savefig(osp.join(args.out_dir, f"overfit_spec.png"))
+    plt.clf()
+    
+    plt.plot(fro, errs)
+    plt.xlabel("Product of CNN Frobenius Norms")
+    plt.ylabel("Test Error")
+    plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
+    plt.savefig(osp.join(args.out_dir, f"overfit_fro.png"))
     plt.clf()
 
 
