@@ -67,6 +67,9 @@ def experiment(args):
     plt.title(f"CIFAR-10, {args.optimizer} {args.lr}, B {args.batch_size}, {args.max_epochs} epochs")
     plt.savefig(osp.join(args.out_dir, f"overfit.png"))
     plt.clf()
+    
+    errs = [x for _, x in zip(norms, errs)]
+    norms = sorted(norms)
 
     plt.plot(norms, errs)
     plt.xlabel("Product of CNN Spectral Norms")
