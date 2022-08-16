@@ -23,7 +23,7 @@ def load_model(args, model_class):
     
     if args.weights:
         checkpoint = torch.load(args.weights, map_location="cpu")
-        state_dict = checkpoint["model"]
+        state_dict = checkpoint["state_dict"]
 
         if args.resume_training:
             args.resume_from_checkpoint = args.weights
