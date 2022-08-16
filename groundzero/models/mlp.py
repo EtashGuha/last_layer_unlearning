@@ -17,7 +17,7 @@ class MLP(Model):
         
         h = [args.mlp_hidden_dim] * (args.mlp_num_layers - 1)
 
-        shapes = zip([args.input_dim] + h, h + [args.num_classes])
+        shapes = zip([args.mlp_input_dim] + h, h + [args.num_classes])
         for i, (n, k) in enumerate(shapes):
             if i == args.mlp_num_layers - 1:
                 self.model.append(nn.Linear(n, k, bias=args.bias))
