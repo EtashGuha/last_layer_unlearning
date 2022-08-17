@@ -30,7 +30,7 @@ class Model(pl.LightningModule):
         return
 
     def forward(self, inputs):
-        return self.model(inputs)
+        return torch.squeeze(self.model(inputs), dim=-1)
 
     def configure_optimizers(self):
         optimizer = self.optimizer(
@@ -55,9 +55,18 @@ class Model(pl.LightningModule):
 
         logits = self(inputs)
 
-        loss = F.cross_entropy(logits, targets)
-
-        probs = F.softmax(logits, dim=1).detach().cpu()
+        if self.hparams.num_classes == 1:
+            if self.hparams.loss == "mse":
+                loss = F.mse_loss(logits, targets.float())
+                probs = logits.detach().cpu()
+            else:
+                loss = F.binary_cross_entropy_with_logits(logits, targets.float())
+                probs = torch.sigmoid(logits).detach().cpu()
+        else:
+            if self.hparams.loss == "mse":
+                return ValueError("MSE is only an option for binary classification.")
+            loss = F.cross_entropy(logits, targets)
+            probs = F.softmax(logits, dim=1).detach().cpu()
 
         targets = targets.cpu()
 
@@ -66,7 +75,7 @@ class Model(pl.LightningModule):
     def training_step(self, batch, idx):
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
+        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
         result["acc1"] = acc1
         self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -80,7 +89,7 @@ class Model(pl.LightningModule):
     def validation_step(self, batch, idx):
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
+        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
         result["acc1"] = acc1
         self.log("val_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("val_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -94,7 +103,7 @@ class Model(pl.LightningModule):
     def test_step(self, batch, idx):
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"])
+        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
         self.log("test_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("test_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("test_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)

@@ -65,7 +65,7 @@ def main(args, model_class, dataset_class, callbacks=None):
     os.makedirs(args.out_dir, exist_ok=True)
 
     dataset = load_dataset(args, dataset_class)
-    args.num_classes = dataset.num_classes
+    args.num_classes = 1 if dataset.num_classes <= 2 else dataset.num_classes
     model = load_model(args, model_class)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
         

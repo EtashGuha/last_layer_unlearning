@@ -22,7 +22,7 @@ class NiN(Model):
             self.model.append(nn.MaxPool2d(3, stride=2))
             self.model.append(nn.Dropout(args.dropout_prob))
         
-        self.model.append(nn.Conv2d(k, args.num_classes, 1, bias=args.bias, padding=args.nin_padding))
+        conv = nn.Conv2d(k, args.num_classes, 1, bias=args.bias, padding=args.nin_padding)
         self.model.append(nn.AdaptiveAvgPool2d((1, 1)))
         self.model.append(nn.Flatten())
 

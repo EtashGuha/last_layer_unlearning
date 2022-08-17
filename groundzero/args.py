@@ -31,6 +31,7 @@ def add_input_args(parser):
     parser.add("--dropout_prob", type=float)
     parser.add("--input_channels", type=int)
     parser.add("--label_noise", type=float)
+    parser.add("--loss", choices=["cross_entropy", "mse"])
     parser.add("--lr", type=float)
     parser.add("--lr_drop", type=float)
     parser.add("--lr_steps", nargs="*", type=int)

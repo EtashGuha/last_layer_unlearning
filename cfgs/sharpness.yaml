@@ -8,11 +8,12 @@ cnn_num_layers: 5
 cnn_padding: 1
 data_augmentation: False
 data_dir: data
-dataset: mnist
+dataset: binary_mnist
 devices: 1
 dropout_prob: 0
 input_channels: 1
 label_noise: 0
+loss: mse
 lr: 0.05
 lr_drop: 0.1
 lr_steps: []

@@ -55,6 +55,23 @@ class Dataset(VisionDataModule):
         self.dataset_class(self.data_dir, train=True, download=True)
         self.dataset_class(self.data_dir, train=False, download=True)
 
+    def train_preprocess(self, dataset_train, dataset_val):
+        gen = Generator().manual_seed(self.seed)
+        train_indices = randperm(len(dataset_train), generator=gen).tolist()
+        train_indices = train_indices[:self._get_splits(len(dataset_train))[0]]
+        if self.label_noise:
+            num_labels = len(train_indices)
+            num_noised_labels = int(self.label_noise * num_labels)
+
+            for i, target in enumerate(train_indices[:num_noised_labels]):
+                labels = [j for j in range(self.num_classes) if j != i]
+                dataset_train.targets[i] = random.choice(labels)
+
+        return dataset_train, dataset_val
+
+    def test_preprocess(self, dataset_test):
+        return dataset_test
+
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
             train_transforms = self.default_transforms() if self.train_transforms is None else self.train_transforms
@@ -63,23 +80,12 @@ class Dataset(VisionDataModule):
             dataset_train = self.dataset_class(self.data_dir, train=True, transform=train_transforms)
             dataset_val = self.dataset_class(self.data_dir, train=True, transform=val_transforms)
 
-            gen = Generator().manual_seed(self.seed)
-            train_indices = randperm(len(dataset_train), generator=gen).tolist()
-            train_indices = train_indices[:self._get_splits(len(dataset_train))[0]]
-            if self.label_noise:
-                num_labels = len(train_indices)
-                num_noised_labels = int(self.label_noise * num_labels)
-
-                for i, target in enumerate(train_indices[:num_noised_labels]):
-                    labels = [j for j in range(self.num_classes) if j != i]
-                    dataset_train.targets[i] = random.choice(labels)
-            
+            dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
             self.dataset_train = self._split_dataset(dataset_train)
             self.dataset_val = self._split_dataset(dataset_val, train=False)
-
+            
         if stage == "test" or stage is None:
             test_transforms = self.default_transforms() if self.test_transforms is None else self.test_transforms
-            self.dataset_test = self.dataset_class(
-                self.data_dir, train=False, transform=test_transforms, **self.EXTRA_ARGS
-            )
+            dataset_test = self.dataset_class(self.data_dir, train=False, transform=test_transforms)
+            self.dataset_test = self.test_preprocess(dataset_test)
 

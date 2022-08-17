@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 from groundzero.models.model import Model
@@ -37,7 +38,7 @@ class MLP(Model):
 
     def forward(self, inputs):
         inputs = inputs.reshape(inputs.shape[0], -1)
-        outputs = self.model(inputs)
+        outputs = torch.squeeze(self.model(inputs), dim=-1)
 
         return outputs
 

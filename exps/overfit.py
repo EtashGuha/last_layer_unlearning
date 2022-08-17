@@ -19,7 +19,7 @@ from groundzero.utils import to_np
 TRAIN_ACC1 = [0]
 MARGIN = [0]
 SHARPNESS = [0]
-WIDTHS = [70]
+WIDTHS = [10]
 NUM_MC_SAMPLES = 10
 SIGMA = 0.01
 
@@ -44,6 +44,7 @@ class OverfitCNN(CNN):
         inputs, targets = batch
         result = super().training_step(batch, batch_idx)
 
+        # TODO: Compute only on final epoch.
         with torch.no_grad():
             probs_wo_true = deepcopy(result["probs"])
             inds = torch.repeat_interleave(result["targets"].unsqueeze(1), self.hparams.num_classes, dim=1)
@@ -61,8 +62,7 @@ class OverfitCNN(CNN):
                     if isinstance(layer, (Conv2d, Linear)):
                         layer.weight = Parameter(torch.normal(layer.weight, SIGMA))
                 logits = self(inputs)
-                sharp_probs = F.softmax(logits, dim=1).detach()
-                sharp_loss.append(F.cross_entropy(sharp_probs, targets).cpu())
+                sharp_loss.append(F.cross_entropy(logits, targets).cpu())
 
                 counter = 0
                 for layer in self.model:
