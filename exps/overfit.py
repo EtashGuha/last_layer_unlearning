@@ -19,7 +19,7 @@ from groundzero.utils import to_np
 TRAIN_ACC1 = [0]
 MARGIN = [0]
 SHARPNESS = [0]
-WIDTHS = [10]
+WIDTHS = [80]
 NUM_MC_SAMPLES = 10
 SIGMA = 0.01
 

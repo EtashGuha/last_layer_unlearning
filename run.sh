@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python exps/overfit.py -c cfgs/overfit.yaml
+python exps/sharpness.py -c cfgs/sharpness.yaml

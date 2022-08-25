@@ -23,13 +23,17 @@ def compute_accuracy(probs, targets, num_classes):
 
     return acc1, acc5
 
+def _to_np(x):
+    return x.cpu().detach().numpy()
+
 def to_np(x):
     if isinstance(x, torch.Tensor):
-        return x.cpu().detach().numpy()
-    elif isinstance(x, np.ndarray):
-        return x
-    elif isinstance(x, list):
-        return np.asarray(x)
+        return _to_np(x)
+    elif isinstance(x, (np.ndarray, list)):
+        if isinstance(x[0], torch.Tensor):
+            return _to_np(torch.tensor(x))
+        else:
+            return np.asarray(x)
     else:
         raise ValueError("Undefined.")
 

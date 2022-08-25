@@ -25,7 +25,7 @@ class MLP(Model):
             else:
                 self.model.append(nn.Linear(n, k, bias=args.bias))
                 self.model.append(activation())
-                self.model.append(nn.Dropout(args.dropout_prob))
+                self.model.append(nn.Dropout(p=args.dropout_prob, inplace=True))
                 
         if args.train_fc_only:
             for p in self.model.parameters():

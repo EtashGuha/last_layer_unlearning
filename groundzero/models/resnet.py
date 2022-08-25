@@ -20,7 +20,7 @@ class ResNet(Model):
         self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7)
 
         self.model.fc = nn.Sequential(
-            nn.Dropout(p=args.dropout_prob),
+            nn.Dropout(p=args.dropout_prob, inplace=True),
             nn.Linear(self.model.fc.in_features, args.num_classes),
         )
 
