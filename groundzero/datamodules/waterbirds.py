@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from torch.utils.data import Subset
+from torch.utils.data import download_and_extract_archive, Subset
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
 
 from groundzero.datamodules.dataset import Dataset
@@ -14,9 +14,9 @@ from groundzero.datamodules.datamodule import DataModule
 class WaterbirdsDataset(Dataset):
     def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
         super().__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
-        self.waterbirds_dir = osp.join(root, "waterbirds")
-        
-        metadata_df = pd.read_csv(osp.join(self.waterbirds_dir, "metadata.csv"))
+
+        waterbirds_dir = osp.join(root, "waterbirds")
+        metadata_df = pd.read_csv(osp.join(waterbirds_dir, "metadata.csv"))
         imgs = np.asarray(metadata_df["img_filename"].values)
 
         data = []
@@ -36,10 +36,11 @@ class WaterbirdsDataset(Dataset):
             self.targets = self.targets[self.test_indices]
 
     def download(self):
-        if not osp.isdir(self.waterbirds_dir):
+        waterbirds_dir = osp.join(self.root, "waterbirds")
+        if not osp.isdir(waterbirds_dir):
             download_and_extract_archive(
                 "http://worksheets.codalab.org/rest/bundles/0x505056d5cdea4e4eaa0e242cbfe2daa4/contents/blob/",
-                self.waterbirds_dir,
+                waterbirds_dir,
                 filename="waterbirds.tar.gz",
             )
 

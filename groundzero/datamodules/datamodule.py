@@ -25,12 +25,6 @@ class DataModule(VisionDataModule):
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
         
-        """
-        self.train_transforms = None
-        self.val_transforms = None
-        self.test_transforms = None
-        """
-
         if self.data_augmentation:
             self.train_transforms = self.augmented_transforms()
 
@@ -43,8 +37,8 @@ class DataModule(VisionDataModule):
         return
  
     def prepare_data(self):
-        self.dataset_cls(self.data_dir, train=True, download=True)
-        self.dataset_cls(self.data_dir, train=False, download=True)
+        self.dataset_class(self.data_dir, train=True, download=True)
+        self.dataset_class(self.data_dir, train=False, download=True)
 
     def load_msg(self):
         msg = f"Loading {type(self).__name__} with {int(self.val_split * 100)}% val split."
