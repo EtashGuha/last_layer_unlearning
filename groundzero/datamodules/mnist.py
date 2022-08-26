@@ -1,10 +1,10 @@
 from pl_bolts.datasets import MNIST as PLMNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
 
-from groundzero.datasets.dataset import Dataset
+from groundzero.datamodules.datamodule import DataModule
 
 
-class MNIST(Dataset):
+class MNIST(DataModule):
     def __init__(self, args):
         super().__init__(args, PLMNIST, 10)
 

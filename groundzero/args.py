@@ -1,7 +1,8 @@
 from configargparse import Parser
+
 from pytorch_lightning import Trainer
 
-import groundzero.datasets
+import groundzero.datamodules
 import groundzero.models
 
 
@@ -27,7 +28,7 @@ def add_input_args(parser):
     parser.add("--cnn_padding", type=int)
     parser.add("--data_augmentation", default=False, type=lambda x: (str(x).lower() == 'true'))
     parser.add("--data_dir")
-    parser.add("--dataset", choices=[n for n in groundzero.datasets.__all__ if n != "dataset"])
+    parser.add("--datamodule", choices=[n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")])
     parser.add("--dropout_prob", type=float)
     parser.add("--input_channels", type=int)
     parser.add("--label_noise", type=float)

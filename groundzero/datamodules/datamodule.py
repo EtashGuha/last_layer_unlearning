@@ -2,11 +2,10 @@ from abc import abstractmethod
 import random
 
 from torch import Generator, randperm
-
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
 
-class Dataset(VisionDataModule):
+class DataModule(VisionDataModule):
     def __init__(self, args, dataset_class, num_classes):
         super().__init__(
             batch_size=args.batch_size,
@@ -26,9 +25,11 @@ class Dataset(VisionDataModule):
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
         
+        """
         self.train_transforms = None
         self.val_transforms = None
         self.test_transforms = None
+        """
 
         if self.data_augmentation:
             self.train_transforms = self.augmented_transforms()
@@ -41,6 +42,10 @@ class Dataset(VisionDataModule):
     def default_transforms(self):
         return
  
+    def prepare_data(self):
+        self.dataset_cls(self.data_dir, train=True, download=True)
+        self.dataset_cls(self.data_dir, train=False, download=True)
+
     def load_msg(self):
         msg = f"Loading {type(self).__name__} with {int(self.val_split * 100)}% val split."
 
@@ -50,10 +55,6 @@ class Dataset(VisionDataModule):
             msg = msg[:-1] + f" and {int(self.label_noise * 100)}% label noise."
 
         return msg
-
-    def prepare_data(self):
-        self.dataset_class(self.data_dir, train=True, download=True)
-        self.dataset_class(self.data_dir, train=False, download=True)
 
     def train_preprocess(self, dataset_train, dataset_val):
         gen = Generator().manual_seed(self.seed)

@@ -16,8 +16,12 @@ class ResNet(Model):
             152: models.resnet152,
         }
 
-        self.model = resnets[args.resnet_version](pretrained=args.resnet_pretrained)
-        self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7)
+        if args.resnet_pretrained:
+            self.model = resnets[args.resnet_version](weights="IMAGENET1K_V2")
+        else:
+            self.model = resnets[args.resnet_version](weights=None)
+
+        # self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7)
 
         self.model.fc = nn.Sequential(
             nn.Dropout(p=args.dropout_prob, inplace=True),

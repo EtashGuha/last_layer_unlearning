@@ -5,6 +5,7 @@ data
 dist
 *.egg-info
 lightning_logs
+*.nfs*
 out
 __pycache__
 *.sh

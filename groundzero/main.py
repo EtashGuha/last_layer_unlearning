@@ -1,21 +1,21 @@
 import os
 
 import torch
-
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
 
+import groundzero
 from groundzero.args import parse_args
-import groundzero.datasets
-import groundzero.models
+from groundzero.datamodules import *
+from groundzero.models import *
 
 
-def load_dataset(args, dataset_class):
-    dataset = dataset_class(args)
-    print(dataset.load_msg())
+def load_datamodule(args, datamodule_class):
+    datamodule = datamodule_class(args)
+    print(datamodule.load_msg())
 
-    return dataset
+    return datamodule
 
 def load_model(args, model_class):
     model = model_class(args)
@@ -60,28 +60,34 @@ def load_trainer(args, addtl_callbacks=None):
 
     return trainer
 
-def main(args, model_class, dataset_class, callbacks=None):
+def main(args, model_class, datamodule_class, callbacks=None):
     seed_everything(seed=args.seed, workers=True)
     os.makedirs(args.out_dir, exist_ok=True)
 
-    dataset = load_dataset(args, dataset_class)
-    args.num_classes = 1 if dataset.num_classes <= 2 else dataset.num_classes
+    datamodule = load_datamodule(args, datamodule_class)
+    args.num_classes = 1 if datamodule.num_classes <= 2 else datamodule.num_classes
     model = load_model(args, model_class)
     trainer = load_trainer(args, addtl_callbacks=callbacks)
         
-    trainer.fit(model, datamodule=dataset)
-    metrics = trainer.test(model, datamodule=dataset)
+    trainer.fit(model, datamodule=datamodule)
+    metrics = trainer.test(model, datamodule=datamodule)
     
     return metrics
 
 
 if __name__ == "__main__":
     args = parse_args()
-    
-    models = dict([(name, cls) for name, cls in groundzero.models.__dict__.items()
-                   if name in groundzero.models.__all__ and name != "model"])
-    datasets = dict([(name, cls) for name, cls in groundzero.datasets.__dict__.items()
-                     if name in groundzero.datasets.__all__ and name != "dataset"])
 
-    main(args, models[args.model], datasets[args.dataset])
+    valid_models = [n for n in groundzero.models.__all__ if n != "model"]
+    valid_datamodules = [n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")]
+
+    models = [groundzero.models.__dict__[name].__dict__ for name in valid_models]
+    models = [dict((k.lower(), v) for k, v in d.items()) for d in models]
+    models = {name: models[j][name.replace("_", "")] for j, name in enumerate(valid_models)} 
+
+    datamodules = [groundzero.datamodules.__dict__[name].__dict__ for name in valid_datamodules]
+    datamodules = [dict((k.lower(), v) for k, v in d.items()) for d in datamodules]
+    datamodules = {name: datamodules[j][name.replace("_", "")] for j, name in enumerate(valid_datamodules)} 
+
+    main(args, models[args.model], datamodules[args.datamodule])
 

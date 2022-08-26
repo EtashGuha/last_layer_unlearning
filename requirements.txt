@@ -2,4 +2,5 @@ configargparse==1.5.3
 git+https://github.com/noahgolmant/pytorch-hessian-eigenthings.git@master#egg=hessian-eigenthings
 lightning-bolts==0.5.0
 matplotlib==3.5.2
+pandas==1.4.3
 pytorch-lightning==1.7.0

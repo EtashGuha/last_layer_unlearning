@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python exps/sharpness.py -c cfgs/sharpness.yaml
+python groundzero/main.py -c cfgs/waterbirds.yaml
