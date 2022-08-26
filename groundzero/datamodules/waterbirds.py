@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from torch.utils.data import download_and_extract_archive, Subset
+from torch.utils.data import  Subset
+from torchvision.datasets.utils import download_and_extract_archive
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
 
 from groundzero.datamodules.dataset import Dataset
