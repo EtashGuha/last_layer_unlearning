@@ -22,7 +22,8 @@ class WaterbirdsDataset(Dataset):
 
         data = []
         for img in imgs:
-            data.append(Image.open(img))
+            img_path = osp.join(waterbirds_dir, img)
+            data.append(Image.open(img_path))
 
         self.data = np.vstack(data)
         self.targets = np.asarray(metadata_df["y"].values)
