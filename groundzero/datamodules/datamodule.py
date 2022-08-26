@@ -24,7 +24,11 @@ class DataModule(VisionDataModule):
         
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
-        
+         
+        self.train_transforms = None
+        self.val_transforms = None
+        self.test_transforms = None
+
         if self.data_augmentation:
             self.train_transforms = self.augmented_transforms()
 

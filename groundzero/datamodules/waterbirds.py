@@ -19,14 +19,12 @@ class WaterbirdsDataset(Dataset):
         waterbirds_dir = osp.join(root, "waterbirds")
         metadata_df = pd.read_csv(osp.join(waterbirds_dir, "metadata.csv"))
         imgs = np.asarray(metadata_df["img_filename"].values)
+        self.targets = np.asarray(metadata_df["y"].values)
 
-        data = []
+        self.data = []
         for img in imgs:
             img_path = osp.join(waterbirds_dir, img)
-            data.append(Image.open(img_path))
-
-        self.data = np.vstack(data)
-        self.targets = np.asarray(metadata_df["y"].values)
+            self.data.append(Image.open(img_path))
 
         split = np.asarray(metadata_df["split"].values)
         self.train_indices = np.argwhere(split == 0)
@@ -34,7 +32,7 @@ class WaterbirdsDataset(Dataset):
         self.test_indices = np.argwhere(split == 2)
 
         if not train:
-            self.data = self.data[self.test_indices]
+            self.data = [d for j, d in enumerate(self.data) if j in self.test_indices]
             self.targets = self.targets[self.test_indices]
 
     def download(self):
