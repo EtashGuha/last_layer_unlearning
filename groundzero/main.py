@@ -1,5 +1,7 @@
 import os
 
+from PIL import ImageFile
+
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
@@ -9,6 +11,8 @@ import groundzero
 from groundzero.args import parse_args
 from groundzero.datamodules import *
 from groundzero.models import *
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def load_datamodule(args, datamodule_class):

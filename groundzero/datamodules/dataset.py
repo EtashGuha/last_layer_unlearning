@@ -21,6 +21,11 @@ class Dataset(VisionDataset):
         return len(self.data)
 
     def __getitem__(self, index):
+        if isinstance(index, list) and len(index) == 1:
+            index = index[0]
+        elif not isinstance(index, int):
+            raise ValueError("Check the datatype of index.")
+
         img, target = self.data[index], self.targets[index]
 
         if isinstance(img, np.ndarray):

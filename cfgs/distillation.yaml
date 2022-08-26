@@ -13,7 +13,7 @@ devices: 1
 dropout_prob: 0
 input_channels: 3
 label_noise: 0
-loss: cross_entropy
+loss: mse
 lr: 1e-3
 lr_drop: 0.1
 lr_steps: []
@@ -33,7 +33,7 @@ optimizer: adam
 out_dir: out
 refresh_rate: 50
 resnet_pretrained: True
-resnet_version: 152
+resnet_version: 18
 resume_training: False
 resume_weights: False
 seed: 42
