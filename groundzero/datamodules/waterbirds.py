@@ -13,26 +13,42 @@ from groundzero.datamodules.datamodule import DataModule
 
 
 class WaterbirdsDataset(Dataset):
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, test_group=0):
         super().__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
 
         waterbirds_dir = osp.join(root, "waterbirds")
         metadata_df = pd.read_csv(osp.join(waterbirds_dir, "metadata.csv"))
-        imgs = np.asarray(metadata_df["img_filename"].values)
-        self.targets = np.asarray(metadata_df["y"].values)
+        self.data = np.asarray(metadata_df["img_filename"].values)
+        self.data = np.asarray([osp.join(waterbirds_dir, d) for d in self.data])
 
-        self.data = []
-        for img in imgs:
-            img_path = osp.join(waterbirds_dir, img)
-            self.data.append(Image.open(img_path))
+        self.targets = np.asarray(metadata_df["y"].values)
+        background = np.asarray(metadata_df["place"].values)
+        landbirds = np.argwhere(self.targets == 0).flatten()
+        waterbirds = np.argwhere(self.targets == 1).flatten()
+        land = np.argwhere(background == 0).flatten()
+        water = np.argwhere(background == 1).flatten()
+        landbirds_on_land = np.intersect1d(landbirds, land)
+        waterbirds_on_water = np.intersect1d(waterbirds, water)
+        landbirds_on_water = np.intersect1d(landbirds, water)
+        waterbirds_on_land = np.intersect1d(waterbirds, land)
 
         split = np.asarray(metadata_df["split"].values)
-        self.train_indices = np.argwhere(split == 0)
-        self.val_indices = np.argwhere(split == 1)
-        self.test_indices = np.argwhere(split == 2)
+        self.train_indices = np.argwhere(split == 0).flatten()
+        self.val_indices = np.argwhere(split == 1).flatten()
+        self.test_indices = np.argwhere(split == 2).flatten()
 
         if not train:
-            self.data = [d for j, d in enumerate(self.data) if j in self.test_indices]
+            # test_group decides which combo of birds/background to test on. 0 is all.
+            if test_group == 1:
+                self.test_indices = np.intersect1d(self.test_indices, landbirds_on_land)
+            elif test_group == 2:
+                self.test_indices = np.intersect1d(self.test_indices, waterbirds_on_water)
+            elif test_group == 3:
+                self.test_indices = np.intersect1d(self.test_indices, landbirds_on_water)
+            elif test_group == 4:
+                self.test_indices = np.intersect1d(self.test_indices, waterbirds_on_land)
+
+            self.data = self.data[self.test_indices]
             self.targets = self.targets[self.test_indices]
 
     def download(self):
@@ -66,6 +82,20 @@ class Waterbirds(DataModule):
             return dataset_train
         return dataset_val
 
+    def test_dataloader(self):
+        dataloaders = []
+        for group in range(5):
+            dataloaders.append(
+                self._data_loader(
+                    self.dataset_class(
+                        self.data_dir,
+                        train=False,
+                        transform=self.default_transforms(),
+                        test_group=group,
+            )))
+
+        return dataloaders
+
     def augmented_transforms(self):
         transform = Compose([
             RandomResizedCrop((224, 224), scale=(0.7, 1.0)),
@@ -79,7 +109,7 @@ class Waterbirds(DataModule):
     def default_transforms(self):
         transform = Compose([
             Resize((256, 256)),
-            CenterCrop((224, 244)),
+            CenterCrop((224, 224)),
             ToTensor(),
             Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])

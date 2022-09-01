@@ -57,10 +57,9 @@ class Model(pl.LightningModule):
         if self.hparams.num_classes == 1:
             if self.hparams.loss == "mse":
                 loss = F.mse_loss(logits, targets.float())
-                probs = logits.detach().cpu()
             else:
                 loss = F.binary_cross_entropy_with_logits(logits, targets.float())
-                probs = torch.sigmoid(logits).detach().cpu()
+            probs = torch.sigmoid(logits).detach().cpu()
         else:
             if self.hparams.loss == "mse":
                 return ValueError("MSE is only an option for binary classification.")
@@ -99,7 +98,7 @@ class Model(pl.LightningModule):
     def validation_epoch_end(self, validation_step_outputs):
         self.val_acc1 = torch.stack([result["acc1"] for result in validation_step_outputs]).mean().item()
 
-    def test_step(self, batch, idx):
+    def test_step(self, batch, idx, dataloader_idx=0):
         result = self.step(batch, idx)
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)

@@ -1,11 +1,11 @@
 accelerator: gpu
-batch_size: 128
+batch_size: 32
 bias: True
 cnn_batchnorm: True
 cnn_initial_width: 32
 cnn_kernel_size: 3
 cnn_num_layers: 5
-cnn_padding: 1
+cnn_padding: 0
 data_augmentation: True
 data_dir: data
 datamodule: waterbirds
@@ -14,10 +14,10 @@ dropout_prob: 0
 input_channels: 3
 label_noise: 0
 loss: cross_entropy
-lr: 1e-3
+lr: 1e-5
 lr_drop: 0.1
 lr_steps: []
-max_epochs: 300
+max_epochs: 50
 model: resnet
 mlp_activation: relu
 mlp_hidden_dim: 256
@@ -38,6 +38,6 @@ resume_training: False
 resume_weights: False
 seed: 42
 train_fc_only: False
-val_split: 0
+val_split: 0.2
 weights: ""
 weight_decay: 1e-4

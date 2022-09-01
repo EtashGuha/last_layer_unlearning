@@ -17,7 +17,7 @@ class ResNet(Model):
         }
 
         if args.resnet_pretrained:
-            self.model = resnets[args.resnet_version](weights="IMAGENET1K_V2")
+            self.model = resnets[args.resnet_version](weights="IMAGENET1K_V1")
         else:
             self.model = resnets[args.resnet_version](weights=None)
 

@@ -34,8 +34,3 @@ class CNN(Model):
     def load_msg(self):
         return f"Loading CNN with {self.hparams.cnn_num_layers} layers and initial width {self.hparams.cnn_initial_width}."
 
-    def forward(self, inputs):
-        outputs = self.model(inputs)
-        
-        return outputs
-
