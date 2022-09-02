@@ -24,6 +24,12 @@ def new_logits(logits):
 
     return torch.cat((col1, col2), 1)
 
+activations = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
+    return hook
+
 def step_helper(self, batch):
     inputs, targets = batch
 
@@ -48,27 +54,7 @@ def step_helper(self, batch):
     if REG == "aux":
         raise NotImplementedError()
     elif REG == "mlp":
-        """ This copying is not correct. Do a forward hook instead: https://discuss.pytorch.org/t/how-can-l-load-my-best-model-as-a-feature-extractor-evaluator/17254/5 """
-        orig_teacher = deepcopy(self.teacher.model.fc)
-        self.teacher.model.fc = self.teacher.model.fc[0]
-        
-        if type(self) == CNN:
-            orig_student = deepcopy(self.model[-1])
-            self.model[-1] = self.model[-1][0]
-        else:
-            orig_student = deepcopy(self.model.fc)
-            self.model.fc = self.model.fc[0]
-            
-        k = self(inputs)
-        teacher_k = self.teacher(inputs)
-
-        loss += LAMBDA * torch.linalg.vector_norm(k - teacher_k, dim=1)
-        
-        self.teacher.model.fc = orig_teacher
-        if type(self) == CNN:
-            self.model[-1] = orig_student
-        else:
-            self.model.fc = orig_student
+        loss += LAMBDA * torch.linalg.vector_norm(activations["teacher"] - activations["student"], dim=1)
 
     targets = targets.cpu()
 
@@ -86,12 +72,15 @@ class TeacherResNet(ResNet):
             fc1 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(self.model.fc[1].in_features, K, bias=args.bias),
+                nn.ReLU(inplace=True),
             )
             fc2 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(K, args.num_classes, bias=args.bias),
             )
             self.model.fc = nn.Sequential(fc1, fc2)
+            
+            self.model.fc[0].register_forward_hook(get_activation("teacher"))
 
 class StudentResNet(ResNet):
     def __init__(self, args):
@@ -103,12 +92,14 @@ class StudentResNet(ResNet):
             fc1 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(self.model.fc[1].in_features, K, bias=args.bias),
+                nn.ReLU(inplace=True),
             )
             fc2 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(K, args.num_classes, bias=args.bias),
             )
             self.model.fc = nn.Sequential(fc1, fc2)
+            self.model.fc[0].register_forward_hook(get_activation("student"))
 
         teacher_args = deepcopy(args)
         teacher_args.resnet_version = 152
@@ -132,9 +123,10 @@ class StudentCNN(CNN):
         if REG == "aux":
             self.model.aux = nn.LazyLinear(K, bias=args.bias)
         elif REG == "mlp":
-            fc1 = nn.LazyLinear(K, bias=args.bias)
+            fc1 = nn.Sequential(nn.LazyLinear(K, bias=args.bias), nn.ReLU(inplace=True))
             fc2 = nn.Linear(K, args.num_classes, bias=args.bias)
             self.model[-1] = nn.Sequential(fc1, fc2)
+            self.model[-1][0].register_forward_hook(get_activation("student"))
             
         teacher_args = deepcopy(args)
         teacher_args.resnet_version = 152
