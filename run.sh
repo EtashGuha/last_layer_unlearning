@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python groundzero/main.py -c cfgs/waterbirds.yaml
+python exps/distillation.py -c cfgs/waterbirds.yaml --resnet_pretrained False

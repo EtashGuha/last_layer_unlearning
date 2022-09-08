@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import torch
+from torch import nn
 import torch.nn.functional as F
 
 from groundzero.args import parse_args
@@ -10,12 +11,17 @@ from groundzero.models.cnn import CNN
 from groundzero.models.resnet import ResNet
 
 TRAIN_TEACHER = False
-REG = None # None, "mlp", "aux"
+REG = "aux" # None, "mlp", "aux"
+TRAIN_W_REG = True
 K = 32
 LAMBDA = 0.01
-KL_DIV = False
-TEACHER_WEIGHTS = "lightning_logs/version_0/checkpoints/epoch=00-val_loss=0.292-val_acc1=0.900.ckpt"
+KL_DIV = True
+#TEACHER_WEIGHTS = "lightning_logs/version_0/checkpoints/epoch=00-val_loss=0.292-val_acc1=0.900.ckpt"
 #TEACHER_WEIGHTS = "lightning_logs/version_0/checkpoints/last.ckpt"
+#TEACHER_WEIGHTS = "lightning_logs/version_144/checkpoints/last.ckpt" # Resnet152 MLP 50epochs
+#TEACHER_WEIGHTS = "lightning_logs/version_145/checkpoints/last.ckpt" # Resnet152 MLP 5epochs
+#TEACHER_WEIGHTS = "lightning_logs/version_171/checkpoints/last.ckpt" # Resnet152 Aux 50epochs
+#TEACHER_WEIGHTS = "lightning_logs/version_168/checkpoints/last.ckpt" # Resnet152 Aux 5epochs
 
 
 def new_logits(logits):
@@ -24,23 +30,32 @@ def new_logits(logits):
 
     return torch.cat((col1, col2), 1)
 
-activations = {}
-def get_activation(name):
+outputs = {}
+def get_output(name):
     def hook(model, input, output):
-        activations[name] = output.detach()
+        outputs[name] = output
     return hook
 
 def step_helper(self, batch):
     inputs, targets = batch
 
-    logits = self(inputs)
-    teacher_logits = self.teacher(inputs)
+    output = self(inputs)
+    if isinstance(output, (tuple, list)):
+        logits = torch.squeeze(output[0], dim=-1)
+    else:
+        logits = output
+
+    teacher_output = self.teacher(inputs)
+    if isinstance(teacher_output, (tuple, list)):
+        teacher_logits = torch.squeeze(teacher_output[0], dim=-1)
+    else:
+        teacher_logits = teacher_output
     
     if self.hparams.num_classes == 1:
         probs = torch.sigmoid(logits).detach().cpu()
         
         if KL_DIV:
-            loss = F.kl_div(F.logsigmoid(new_logits(logits)), F.sigmoid(new_logits(teacher_logits)), reduction="batchmean")
+            loss = F.kl_div(F.logsigmoid(new_logits(logits)), torch.sigmoid(new_logits(teacher_logits)), reduction="batchmean")
     else:
         probs = F.softmax(logits, dim=1).detach().cpu()
         
@@ -50,11 +65,16 @@ def step_helper(self, batch):
      
     if not KL_DIV:
         loss = F.mse_loss(logits, teacher_logits)
+    self.log("base_train_loss", loss, prog_bar=True, sync_dist=True)
         
-    if REG == "aux":
-        raise NotImplementedError()
-    elif REG == "mlp":
-        loss += LAMBDA * torch.linalg.vector_norm(activations["teacher"] - activations["student"], dim=1)
+    if REG == "aux" and TRAIN_W_REG:
+        reg = LAMBDA * torch.linalg.vector_norm(teacher_output[1] - output[1], dim=1).mean()
+        self.log("reg_loss", reg, prog_bar=True, sync_dist=True)
+        loss += reg
+    elif REG == "mlp" and TRAIN_W_REG:
+        reg = LAMBDA * torch.linalg.vector_norm(outputs["teacher"] - outputs["student"], dim=1).mean()
+        self.log("reg_loss", reg, prog_bar=True, sync_dist=True)
+        loss += reg
 
     targets = targets.cpu()
 
@@ -69,18 +89,36 @@ class TeacherResNet(ResNet):
             for p in self.model.aux.parameters():
                 p.requires_grad = False
         elif REG == "mlp":
-            fc1 = nn.Sequential(
+            self.model.fc = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(self.model.fc[1].in_features, K, bias=args.bias),
                 nn.ReLU(inplace=True),
-            )
-            fc2 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(K, args.num_classes, bias=args.bias),
             )
-            self.model.fc = nn.Sequential(fc1, fc2)
-            
-            self.model.fc[0].register_forward_hook(get_activation("teacher"))
+            self.model.fc[1].register_forward_hook(get_output("teacher"))
+
+    def forward(self, x):
+        if TRAIN_W_REG == True and REG == "aux":
+            x = self.model.conv1(x)
+            x = self.model.bn1(x)
+            x = self.model.relu(x)
+            x = self.model.maxpool(x)
+
+            x = self.model.layer1(x)
+            x = self.model.layer2(x)
+            x = self.model.layer3(x)
+            x = self.model.layer4(x)
+
+            x = self.model.avgpool(x)
+            x = torch.flatten(x, 1)
+
+            y = self.model.aux(x)
+            x = self.model.fc(x)
+
+            return (x, y)
+        else:
+            return super().forward(x)
 
 class StudentResNet(ResNet):
     def __init__(self, args):
@@ -89,21 +127,18 @@ class StudentResNet(ResNet):
         if REG == "aux":
             self.model.aux = nn.Linear(self.model.fc[1].in_features, K, bias=args.bias)
         elif REG == "mlp":
-            fc1 = nn.Sequential(
+            self.model.fc = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(self.model.fc[1].in_features, K, bias=args.bias),
                 nn.ReLU(inplace=True),
-            )
-            fc2 = nn.Sequential(
                 nn.Dropout(p=args.dropout_prob, inplace=True),
                 nn.Linear(K, args.num_classes, bias=args.bias),
             )
-            self.model.fc = nn.Sequential(fc1, fc2)
-            self.model.fc[0].register_forward_hook(get_activation("student"))
+            self.model.fc[1].register_forward_hook(get_output("student"))
 
         teacher_args = deepcopy(args)
         teacher_args.resnet_version = 152
-        self.teacher = ResNet(teacher_args)
+        self.teacher = TeacherResNet(teacher_args)
         state_dict = torch.load(TEACHER_WEIGHTS, map_location="cpu")["state_dict"]
         self.teacher.load_state_dict(state_dict, strict=False)
 
@@ -111,10 +146,44 @@ class StudentResNet(ResNet):
         for p in self.teacher.parameters():
             p.requires_grad = False
 
-    # re-define forward for aux?
+    def forward(self, x):
+        if TRAIN_W_REG == True and REG == "aux":
+            x = self.model.conv1(x)
+            x = self.model.bn1(x)
+            x = self.model.relu(x)
+            x = self.model.maxpool(x)
+
+            x = self.model.layer1(x)
+            x = self.model.layer2(x)
+            x = self.model.layer3(x)
+            x = self.model.layer4(x)
+
+            x = self.model.avgpool(x)
+            x = torch.flatten(x, 1)
+
+            y = self.model.aux(x)
+            x = self.model.fc(x)
+
+            return (x, y)
+        else:
+            return super().forward(x)
     
     def step(self, batch, idx):
         return step_helper(self, batch)
+
+class TeacherCNN(CNN):
+    def __init__(self, args):
+        super().__init__(args)
+        
+        if REG == "aux":
+            self.model.aux = nn.LazyLinear(K, bias=args.bias)
+        elif REG == "mlp":
+            self.model[-1] = nn.Sequential(
+                nn.LazyLinear(K, bias=args.bias),
+                nn.ReLU(inplace=True),
+                nn.Linear(K, args.num_classes, bias=args.bias),
+            )
+            self.model[-1][0].register_forward_hook(get_output("student"))
 
 class StudentCNN(CNN):
     def __init__(self, args):
@@ -123,14 +192,16 @@ class StudentCNN(CNN):
         if REG == "aux":
             self.model.aux = nn.LazyLinear(K, bias=args.bias)
         elif REG == "mlp":
-            fc1 = nn.Sequential(nn.LazyLinear(K, bias=args.bias), nn.ReLU(inplace=True))
-            fc2 = nn.Linear(K, args.num_classes, bias=args.bias)
-            self.model[-1] = nn.Sequential(fc1, fc2)
-            self.model[-1][0].register_forward_hook(get_activation("student"))
+            self.model[-1] = nn.Sequential(
+                nn.LazyLinear(K, bias=args.bias),
+                nn.ReLU(inplace=True),
+                nn.Linear(K, args.num_classes, bias=args.bias),
+            )
+            self.model[-1][0].register_forward_hook(get_output("student"))
             
         teacher_args = deepcopy(args)
         teacher_args.resnet_version = 152
-        self.teacher = ResNet(teacher_args)
+        self.teacher = TeacherResNet(teacher_args)
         state_dict = torch.load(TEACHER_WEIGHTS, map_location="cpu")["state_dict"]
         self.teacher.load_state_dict(state_dict, strict=False)
 
@@ -145,7 +216,10 @@ class StudentCNN(CNN):
 
 def experiment(args):
     if TRAIN_TEACHER:
-        arch = TeacherResNet
+        if args.model == "resnet":
+            arch = TeacherResNet
+        elif args.model == "cnn":
+            arch = TeacherCNN
     else:
         if args.model == "resnet":
             args.resnet_version = 18

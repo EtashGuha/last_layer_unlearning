@@ -54,6 +54,9 @@ class Model(pl.LightningModule):
 
         logits = self(inputs)
 
+        if isinstance(logits, (tuple, list)):
+            logits = torch.squeeze(logits[0], dim=-1)
+
         if self.hparams.num_classes == 1:
             if self.hparams.loss == "mse":
                 loss = F.mse_loss(logits, targets.float())
