@@ -76,7 +76,7 @@ def main(args, model_class, datamodule_class, callbacks=None):
     trainer.fit(model, datamodule=datamodule)
     metrics = trainer.test(model, datamodule=datamodule)
     
-    return metrics
+    return model, metrics
 
 
 if __name__ == "__main__":

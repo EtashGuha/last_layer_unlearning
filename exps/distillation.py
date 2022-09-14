@@ -10,9 +10,9 @@ from groundzero.main import main
 from groundzero.models.cnn import CNN
 from groundzero.models.resnet import ResNet
 
-TRAIN_TEACHER = False
-REG = "aux" # None, "mlp", "aux"
-TRAIN_W_REG = True
+TRAIN_TEACHER = True
+REG = None # None, "mlp", "aux"
+TRAIN_W_REG = False
 K = 32
 LAMBDA = 0.01
 KL_DIV = True

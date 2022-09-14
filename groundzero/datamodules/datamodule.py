@@ -55,10 +55,18 @@ class DataModule(VisionDataModule):
         return msg
 
     def train_preprocess(self, dataset_train, dataset_val):
-        gen = Generator().manual_seed(self.seed)
-        train_indices = randperm(len(dataset_train), generator=gen).tolist()
-        train_indices = train_indices[:self._get_splits(len(dataset_train))[0]]
         if self.label_noise:
+            gen = Generator().manual_seed(self.seed)
+
+            # todo: make sure train_indices etc. are specified for pre-assigned splits
+            # if label noise is nonzero and there is a pre-assigned split, but train_indices
+            # is not set, then this procedure will apply noise to the val set!
+            if hasattr(dataset_train, "train_indices"):
+                train_indices = dataset_train.train_indices
+            else:
+                train_indices = randperm(len(dataset_train), generator=gen).tolist()
+                train_indices = train_indices[:self._get_splits(len(dataset_train))[0]]
+
             num_labels = len(train_indices)
             num_noised_labels = int(self.label_noise * num_labels)
 

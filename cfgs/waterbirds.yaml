@@ -7,6 +7,7 @@ cnn_num_layers: 5
 cnn_padding: 0
 data_augmentation: True
 datamodule: waterbirds
+devices: 1
 lr: 1e-5
 max_epochs: 50
 model: resnet

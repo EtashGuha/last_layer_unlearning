@@ -1,9 +1,11 @@
 import os.path as osp
+import random
 
 import numpy as np
 import pandas as pd
 from PIL import Image
 
+import torch
 from torch.utils.data import  Subset
 from torchvision.datasets.utils import download_and_extract_archive
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
@@ -116,3 +118,103 @@ class Waterbirds(DataModule):
 
         return transform
 
+class WaterbirdsDisagreement(Waterbirds):
+    def __init__(self, args, disagreement_set=None, disagreement_proportion=None, student=None, lmbda=None):
+        super().__init__(args)
+        self.disagreement_set = disagreement_set
+        self.disagreement_proportion = disagreement_proportion
+        self.student = student
+        self.lmbda = lmbda
+
+        if disagreement_set == "train":
+            raise ValueError("did not implement transforms yet, use val")
+
+    def load_msg(self):
+        msg = super().load_msg()
+        msg = msg[:-1] + f", with disagreement set {self.disagreement_set} and proportion {self.disagreement_proportion}."
+        return msg
+
+    def _split_dataset(self, dataset, disagreement_proportion=None, train=True):
+        if train:
+            inds = dataset.train_indices
+        else:
+            inds = dataset.val_indices
+
+        if disagreement_proportion:
+            random.shuffle(inds)
+            disagreement_num = int(disagreement_proportion * len(inds))
+
+            dataset_reg = Subset(dataset, inds[disagreement_num:])
+            dataset_disagreement = Subset(dataset, inds[:disagreement_num])
+
+            return dataset_reg, dataset_disagreement
+        else:
+            return Subset(dataset, inds)
+
+    def disagreement_dataloader(self):
+        return self._data_loader(self.dataset_disagreement, shuffle=False)
+
+    def disagreement(self):
+        self.student.eval()
+        dataloader = self.disagreement_dataloader()
+        batch_size = dataloader.batch_size
+
+        indices = []
+        with torch.no_grad():
+            for i, batch in enumerate(dataloader):
+                inputs, _ = batch
+
+                logits = self.student(inputs)
+                teacher_logits = self.student.teacher(inputs)
+
+                preds = torch.sigmoid(logits) > 0.5
+                teacher_preds = torch.sigmoid(teacher_logits) > 0.5
+
+                # add disagreements
+                disagreements = torch.logical_xor(preds, teacher_preds).tolist()
+                inds = [j + (i * batch_size) for j, d in enumerate(disagreements) if d == True]
+                indices.extend(inds)
+
+                # add specified proportion of agreements
+                inds = [j + (i * batch_size) for j, d in enumerate(disagreements) if d == False]
+                num_agreements = int(self.lmbda / 1 - self.lmbda)
+                if num_agreements > len(inds):
+                    raise ValueError("Lambda is too small")
+                inds = inds[:num_agreements]
+                indices.extend(inds)
+
+        # needs to be changed for disagreement set train
+        train_transforms = self.default_transforms() if self.train_transforms is None else self.train_transforms
+        val = self.dataset_class(self.data_dir, train=True, transform=train_transforms)
+        _, disagreement = self._split_dataset(val, disagreement_proportion=self.disagreement_proportion, train=False)
+        self.dataset_train = Subset(disagreement, indices)
+
+        # print the numbers of disagreements by category
+
+    def setup(self, stage=None):
+        if stage == "fit" or stage is None:
+            train_transforms = self.default_transforms() if self.train_transforms is None else self.train_transforms
+            val_transforms = self.default_transforms() if self.val_transforms is None else self.val_transforms
+
+            dataset_train = self.dataset_class(self.data_dir, train=True, transform=train_transforms)
+            dataset_val = self.dataset_class(self.data_dir, train=True, transform=val_transforms)
+
+            dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
+            if self.disagreement_set == "train":
+                # here we actually want no transforms on the disagreement set?
+                self.dataset_train, self.dataset_disagreement = self._split_dataset(dataset_train, disagreement_proportion=self.disagreement_proportion)
+                self.dataset_val = self._split_dataset(dataset_val, train=False)
+            elif self.disagreement_set == "val":
+                self.dataset_train = self._split_dataset(dataset_train)
+                self.dataset_val, self.dataset_disagreement = self._split_dataset(dataset_val, disagreement_proportion=self.disagreement_proportion, train=False)
+
+            # perform disagreement and set new train dataset
+            if self.student:
+                print("Computing disagreements...")
+                self.disagreement()
+                del self.student
+
+        if stage == "test" or stage is None:
+            test_transforms = self.default_transforms() if self.test_transforms is None else self.test_transforms
+            dataset_test = self.dataset_class(self.data_dir, train=False, transform=test_transforms)
+            self.dataset_test = self.test_preprocess(dataset_test)

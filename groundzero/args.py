@@ -1,4 +1,5 @@
 from configargparse import Parser
+from distutils.util import strtobool
 
 from pytorch_lightning import Trainer
 
@@ -20,13 +21,13 @@ def parse_args():
 
 def add_input_args(parser):
     parser.add("--batch_size", type=int)
-    parser.add("--bias", default=True, type=lambda x: (str(x).lower() == "false"))
-    parser.add("--cnn_batchnorm", default=True, type=lambda x: (str(x).lower() == "false"))
+    parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
+    parser.add("--cnn_batchnorm", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--cnn_initial_width", default=32, type=int)
     parser.add("--cnn_kernel_size", default=3, type=int)
     parser.add("--cnn_num_layers", default=5, type=int)
     parser.add("--cnn_padding", default=0, type=int)
-    parser.add("--data_augmentation", default=True, type=lambda x: (str(x).lower() == "false"))
+    parser.add("--data_augmentation", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--data_dir", default="data")
     parser.add("--datamodule", choices=[n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")])
     parser.add("--dropout_prob", default=0, type=float)
@@ -49,12 +50,12 @@ def add_input_args(parser):
     parser.add("--optimizer", choices=["adam", "adamw", "sgd"], default="adam")
     parser.add("--out_dir", default="out")
     parser.add("--refresh_rate", default=1, type=int)
-    parser.add("--resnet_pretrained", default=True, type=lambda x: (str(x).lower() == "false"))
+    parser.add("--resnet_pretrained", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--resnet_version", choices=[18, 34, 50, 101, 152], default=18, type=int)
-    parser.add("--resume_training", default=False, type=lambda x: (str(x).lower() == "true"))
-    parser.add("--resume_weights", default=False, type=lambda x: (str(x).lower() == "true"))
+    parser.add("--resume_training", default=False, type=lambda x: bool(strtobool(x)))
+    parser.add("--resume_weights", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--seed", default=42, type=int)
-    parser.add("--train_fc_only", default=False, type=lambda x: (str(x).lower() == "true"))
+    parser.add("--train_fc_only", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--val_split", default=0.2, type=float)
     parser.add("--weights", default="")
     parser.add("--weight_decay", default=1e-4, type=float)

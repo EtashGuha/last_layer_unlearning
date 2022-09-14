@@ -6,40 +6,20 @@ import torch.nn.functional as F
 from torch.utils.data import Subset
 
 from groundzero.args import parse_args
-from groundzero.datamodules.waterbirds import Waterbirds
-from groundzero.main import main
+from groundzero.datamodules.waterbirds import WaterbirdsDisagreement
+from groundzero.main import load_model, main
 from groundzero.models.cnn import CNN
 from groundzero.models.resnet import ResNet
 
-TRAIN_TEACHER = False
-KL_DIV = True
-#TEACHER_WEIGHTS = "lightning_logs/version_168/checkpoints/last.ckpt" # Resnet152 Aux 5epochs
+MODE = "distillation" # "train_teacher", "distillation", "disagreement"
+LAMBDA = 0.5
+DISAGREEMENT_SET = "val"
+DISAGREEMENT_PROPORTION = 0.8
+TEACHER_WEIGHTS = "lightning_logs/version_186/checkpoints/last.ckpt" # Resnet152 5epochs
 
-
-def disagreement(teacher, student, batch_size):
-    teacher = teacher.eval()
-    student = student.eval()
-
-    dataloader = Waterbirds.val_dataloader()
-    indices = []
-
-    with torch.no_grad():
-        for i, batch in enumerate(dataloader):
-            inputs, _ = batch
-
-            logits = student(inputs)
-            teacher_logits = teacher(inputs)
-
-            preds = torch.sigmoid(logits) > 0.5
-            teacher_preds = torch.sigmoid(teacher_logits) > 0.5
-
-            disagreements = torch.logical_xor(preds, teacher_preds)
-            inds = [j + (i * batch_size) for j, d in disagreements if d == True]
-            indices.extend(inds)
-
-    new_dataset = Subset(dataloader.dataset, indices)
-
-    # return datamodule with new_dataset as training?
+class Waterbirds2(WaterbirdsDisagreement):
+    def __init__(self, args, student=None, lmbda=None):
+        super().__init__(args, disagreement_set=DISAGREEMENT_SET, disagreement_proportion=DISAGREEMENT_PROPORTION, student=student, lmbda=lmbda)
 
 def new_logits(logits):
     """Sigmoid to probability distribution for softmax."""
@@ -109,20 +89,39 @@ class StudentCNN(CNN):
         return step_helper(self, batch)
 
 def experiment(args):
-    if TRAIN_TEACHER:
+    if MODE == "train_teacher":
         if args.model == "resnet":
             arch = ResNet
         elif args.model == "cnn":
             arch = CNN
-    else:
+        main(args, arch, Waterbirds2)
+    elif MODE == "distillation":
+        if args.model == "resnet":
+            args.resnet_version = 18
+            arch = StudentResNet
+        elif args.model == "cnn":
+            arch = StudentCNN
+        main(args, arch, Waterbirds2)
+    elif MODE == "disagreement":
+        if not args.weights:
+            raise ValueError()
+
+        args.train_fc_only = True
+        args.num_classes = 1
+
         if args.model == "resnet":
             args.resnet_version = 18
             arch = StudentResNet
         elif args.model == "cnn":
             arch = StudentCNN
 
-    main(args, arch, Waterbirds)
+        model = load_model(args, arch)
 
+        class Waterbirds3(Waterbirds2):
+            def __init__(self, args):
+                super().__init__(args, student=model, lmbda=LAMBDA)
+
+        main(args, arch, Waterbirds3)
 
 if __name__ == "__main__":
     args = parse_args()
