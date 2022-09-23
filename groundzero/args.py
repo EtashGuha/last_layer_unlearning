@@ -32,6 +32,7 @@ def add_input_args(parser):
     parser.add("--datamodule", choices=[n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")])
     parser.add("--dropout_prob", default=0, type=float)
     parser.add("--input_channels", default=3, type=int)
+    parser.add("--l1_regularization", default=0, type=float)
     parser.add("--label_noise", default=0, type=float)
     parser.add("--loss", default="cross_entropy", choices=["cross_entropy", "mse"])
     parser.add("--lr", type=float)

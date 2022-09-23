@@ -69,6 +69,14 @@ class Model(pl.LightningModule):
             loss = F.cross_entropy(logits, targets)
             probs = F.softmax(logits, dim=1).detach().cpu()
 
+        if self.hparams.l1_regularization:
+            if self.hparams.train_fc_only: # hack just for resnet right now
+                params = torch.cat([x.view(-1) for x in self.model.fc.parameters()])
+                loss += self.hparams.l1_regularization * torch.linalg.vector_norm(params, ord=1)
+            else:
+                all_params = torch.cat([x.view(-1) for x in self.model.parameters()])
+                loss += self.hparams.l1_regularization * torch.linalg.vector_norm(all_params, ord=1)
+
         targets = targets.cpu()
 
         return {"loss": loss, "probs": probs, "targets": targets}
@@ -87,19 +95,23 @@ class Model(pl.LightningModule):
     def training_epoch_end(self, training_step_outputs):
         self.train_acc1 = torch.stack([result["acc1"] for result in training_step_outputs]).mean().item()
 
-    def validation_step(self, batch, idx):
+    def validation_step(self, batch, idx, dataloader_idx=0):
         result = self.step(batch, idx)
 
         acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
         result["acc1"] = acc1
-        self.log("val_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True)
+        if dataloader_idx == 0:
+            self.log("val_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True, add_dataloader_idx=False)
         self.log("val_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log("val_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return result
 
     def validation_epoch_end(self, validation_step_outputs):
-        self.val_acc1 = torch.stack([result["acc1"] for result in validation_step_outputs]).mean().item()
+        v = validation_step_outputs
+        if len(v) > 1: #handle multiple dataloaders
+            v = v[0]
+        self.val_acc1 = torch.stack([result["acc1"] for result in v]).mean().item()
 
     def test_step(self, batch, idx, dataloader_idx=0):
         result = self.step(batch, idx)

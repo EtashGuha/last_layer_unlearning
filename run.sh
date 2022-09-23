@@ -1,3 +1,3 @@
 #!/bin/sh
 
-python exps/disagreement.py -c cfgs/waterbirds.yaml --resnet_pretrained False
+python exps/disagreement.py -c cfgs/waterbirds.yaml --seed 42 --max_epochs 5
