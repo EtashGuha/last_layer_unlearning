@@ -2,10 +2,10 @@ import os
 
 from PIL import ImageFile
 
-import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, TQDMProgressBar
 from pytorch_lightning.utilities.seed import seed_everything
+import torch
 
 import groundzero
 from groundzero.args import parse_args

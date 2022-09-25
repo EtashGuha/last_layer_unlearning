@@ -1,13 +1,16 @@
+"""TODO: A lot of this code is the same as Waterbirds. Combine?"""
+
 import os.path as osp
 import random
 
 import numpy as np
 import pandas as pd
 from PIL import Image
+import wget
 
 import torch
 from torch.utils.data import  Subset
-from torchvision.datasets.utils import download_and_extract_archive
+from torchvision.datasets.utils import download_file_from_google_drive, extract_archive
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
 
 from groundzero.datamodules.dataset import Dataset
@@ -15,70 +18,66 @@ from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
 
-class WaterbirdsDataset(Dataset):
+class CelebADataset(Dataset):
     def __init__(self, root, train=True, transform=None, target_transform=None, download=False, test_group=0):
         super().__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
 
-        waterbirds_dir = osp.join(root, "waterbirds")
-        metadata_df = pd.read_csv(osp.join(waterbirds_dir, "metadata.csv"))
+        celeba_dir = osp.join(root, "celeba")
+        metadata_df = pd.read_csv(osp.join(celeba_dir, "celeba_metadata.csv"))
         self.data = np.asarray(metadata_df["img_filename"].values)
-        self.data = np.asarray([osp.join(waterbirds_dir, d) for d in self.data])
+        self.data = np.asarray([osp.join(celeba_dir, d) for d in self.data])
 
         self.targets = np.asarray(metadata_df["y"].values)
-        background = np.asarray(metadata_df["place"].values)
-        landbirds = np.argwhere(self.targets == 0).flatten()
-        waterbirds = np.argwhere(self.targets == 1).flatten()
-        land = np.argwhere(background == 0).flatten()
-        water = np.argwhere(background == 1).flatten()
-        self.landbirds_on_land = np.intersect1d(landbirds, land)
-        self.waterbirds_on_water = np.intersect1d(waterbirds, water)
-        self.landbirds_on_water = np.intersect1d(landbirds, water)
-        self.waterbirds_on_land = np.intersect1d(waterbirds, land)
+        gender = np.asarray(metadata_df["place"].values)
+        nonblond = np.argwhere(self.targets == 0).flatten()
+        blond = np.argwhere(self.targets == 1).flatten()
+        women = np.argwhere(gender == 0).flatten()
+        men = np.argwhere(gender == 1).flatten()
+        self.nonblond_women = np.intersect1d(nonblond, women)
+        self.nonblond_men = np.intersect1d(nonblond, men)
+        self.blond_women = np.intersect1d(blond, women)
+        self.blond_men = np.intersect1d(blond, men)
 
         split = np.asarray(metadata_df["split"].values)
         self.train_indices = np.argwhere(split == 0).flatten()
         self.val_indices = np.argwhere(split == 1).flatten()
         self.test_indices = np.argwhere(split == 2).flatten()
 
-        """
-        for n, x in zip(("Train", "Val", "Test"), (self.train_indices, self.val_indices, self.test_indices)):
-            g1 = len(np.intersect1d(x, self.landbirds_on_land))
-            g2 = len(np.intersect1d(x, self.waterbirds_on_water))
-            g3 = len(np.intersect1d(x, self.landbirds_on_water))
-            g4 = len(np.intersect1d(x, self.waterbirds_on_land))
-            print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
-        """
-
         # test_group decides which combo of birds/background to test on. 0 is all.
         if test_group == 1:
-            self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_land)
-            self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_land)
+            self.val_indices = np.intersect1d(self.val_indices, self.nonblond_women)
+            self.test_indices = np.intersect1d(self.test_indices, self.nonblond_women)
         elif test_group == 2:
-            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_water)
-            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_water)
+            self.val_indices = np.intersect1d(self.val_indices, self.nonblond_men)
+            self.test_indices = np.intersect1d(self.test_indices, self.nonblond_men)
         elif test_group == 3:
-            self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_water)
-            self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_water)
+            self.val_indices = np.intersect1d(self.val_indices, self.blond_women)
+            self.test_indices = np.intersect1d(self.test_indices, self.blond_women)
         elif test_group == 4:
-            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_land)
-            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_land)
+            self.val_indices = np.intersect1d(self.val_indices, self.blond_men)
+            self.test_indices = np.intersect1d(self.test_indices, self.blond_men)
 
         if not train:
             self.data = self.data[self.test_indices]
             self.targets = self.targets[self.test_indices]
 
     def download(self):
-        waterbirds_dir = osp.join(self.root, "waterbirds")
-        if not osp.isdir(waterbirds_dir):
-            download_and_extract_archive(
-                "http://worksheets.codalab.org/rest/bundles/0x505056d5cdea4e4eaa0e242cbfe2daa4/contents/blob/",
-                waterbirds_dir,
-                filename="waterbirds.tar.gz",
+        celeba_dir = osp.join(self.root, "celeba")
+        if not osp.isdir(celeba_dir):
+            download_file_from_google_drive(
+                "0B7EVK8r0v71pZjFTYXZWM3FlRnM",
+                celeba_dir,
+                filename="celeba.zip",
+            )
+            extract_archive(osp.join(celeba_dir, "celeba.zip"))
+            wget.download(
+                "https://github.com/PolinaKirichenko/deep_feature_reweighting/blob/main/celeba_metadata.csv",
+                out=celeba_dir,
             )
 
-class Waterbirds(DataModule):
+class CelebA(DataModule):
     def __init__(self, args):
-        super().__init__(args, WaterbirdsDataset, 2)
+        super().__init__(args, CelebADataset, 2)
 
     def load_msg(self):
         msg = f"Loading {type(self).__name__} with default val split."
@@ -149,7 +148,7 @@ class Waterbirds(DataModule):
 
         return transform
 
-class WaterbirdsDisagreement(Waterbirds):
+class CelebADisagreement(CelebA):
     def __init__(self, args, model=None, gamma=1, misclassification_dfr=False, full_set_dfr=False, dropout=False, rebalancing=False):
         super().__init__(args)
         self.model = model
@@ -196,10 +195,10 @@ class WaterbirdsDisagreement(Waterbirds):
         return self._data_loader(self.dataset_disagreement, shuffle=True)
 
     def rebalance_groups(self, indices, dataset):
-        g1 = np.intersect1d(indices, dataloader.dataset.landbirds_on_land)
-        g2 = np.intersect1d(indices, dataloader.dataset.waterbirds_on_water)
-        g3 = np.intersect1d(indices, dataloader.dataset.landbirds_on_water)
-        g4 = np.intersect1d(indices, dataloader.dataset.waterbirds_on_land)
+        g1 = np.intersect1d(indices, dataloader.dataset.nonblond_women)
+        g2 = np.intersect1d(indices, dataloader.dataset.nonblond_men)
+        g3 = np.intersect1d(indices, dataloader.dataset.blond_women)
+        g4 = np.intersect1d(indices, dataloader.dataset.blond_men)
 
         m = min(len(g1), len(g2), len(g3), len(g4))
 
@@ -214,9 +213,6 @@ class WaterbirdsDisagreement(Waterbirds):
 
     def rebalance_classes(self, disagree, agree, disagree_targets, agree_targets):
         for i, t in enumerate((disagree_targets, agree_targets)):
-            if not t:
-                return
-
             num_one = np.count_nonzero(t)
             num_zero = len(t) - num_one
             to_remove = abs(num_zero - num_one)
@@ -297,21 +293,17 @@ class WaterbirdsDisagreement(Waterbirds):
                     agree_targets.extend(targets[~disagreements].tolist())
 
             # Gets a gamma proportion of agreement points.
-            if self.gamma:
-                num_agree = int(self.gamma * len(disagree))
-                c = list(zip(agree, agree_targets))
-                random.shuffle(c)
-                agree, agree_targets = zip(*c)
-                agree = agree[:num_agree]
-                agree_targets = agree_targets[:num_agree]
-            else: # gamma == 0
-                agree = [] 
-                agree_targets = []
+            num_agree = int(self.gamma * len(disagree))
+            c = list(zip(agree, agree_targets))
+            random.shuffle(c)
+            agree, agree_targets = zip(*c)
+            agree = agree[:num_agree]
+            agree_targets = agree_targets[:num_agree]
 
-            disagree = np.asarray(disagree, dtype=np.int64)
-            disagree_targets = np.asarray(disagree_targets, dtype=np.int64)
-            agree = np.asarray(agree, dtype=np.int64)
-            agree_targets = np.asarray(agree_targets, dtype=np.int64)
+            disagree = np.asarray(disagree)
+            disagree_targets = np.asarray(disagree_targets)
+            agree = np.asarray(agree)
+            agree_targets = np.asarray(agree_targets)
 
             # rebalancing
             # use class labels here
@@ -319,16 +311,15 @@ class WaterbirdsDisagreement(Waterbirds):
                 disagree, agree = self.rebalance_classes(disagree, agree, disagree_targets, agree_targets)
                             
             indices = np.concatenate((disagree, agree))
-
-        self.dataset_train = Subset(new_set, indices)
+            self.dataset_train = Subset(new_set, indices)
 
         # print the numbers of disagreements by category
         # needs to be changed for disagreement set train
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
-            g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
-            g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
-            g3 = len(np.intersect1d(x, new_set.landbirds_on_water))
-            g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
+            g1 = len(np.intersect1d(x, new_set.nonblond_women))
+            g2 = len(np.intersect1d(x, new_set.nonblond_men))
+            g3 = len(np.intersect1d(x, new_set.blond_women))
+            g4 = len(np.intersect1d(x, new_set.blond_men))
             print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
 
     def setup(self, stage=None):

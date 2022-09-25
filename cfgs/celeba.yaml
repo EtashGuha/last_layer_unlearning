@@ -1,13 +1,13 @@
 accelerator: gpu
 batch_size: 32
 data_augmentation: True
-datamodule: waterbirds
+datamodule: celeba
 devices: 1
 lr: 1e-3
-max_epochs: 50
+max_epochs: 15
 model: resnet
 momentum: 0.9
 optimizer: sgd
-refresh_rate: 150
+refresh_rate: 2600
 resnet_pretrained: True
 resnet_version: 50

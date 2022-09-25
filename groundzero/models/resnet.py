@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torchvision.models as models
 
@@ -40,3 +41,15 @@ class ResNet(Model):
         else:
             return f"Loading ResNet{self.hparams.resnet_version} with no pretraining."
 
+    def step(self, batch, idx):
+        result = super().step(batch, idx)
+
+        if self.hparams.resnet_l1_regularization:
+            if self.hparams.train_fc_only:
+                params = torch.cat([x.view(-1) for x in self.model.fc.parameters()])
+                result["loss"] += self.hparams.resnet_l1_regularization * torch.linalg.vector_norm(params, ord=1)
+            else:
+                all_params = torch.cat([x.view(-1) for x in self.model.parameters()])
+                result["loss"] += self.hparams.resnet_l1_regularization * torch.linalg.vector_norm(all_params, ord=1)
+
+        return result

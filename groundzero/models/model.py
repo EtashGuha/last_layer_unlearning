@@ -1,12 +1,12 @@
 from abc import abstractmethod
 
+import pytorch_lightning as pl
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.optim import Adam, AdamW, SGD
 from torch.optim.lr_scheduler import MultiStepLR
 import torchvision.models as models
-import pytorch_lightning as pl
 
 from groundzero.utils import compute_accuracy
 
@@ -68,14 +68,6 @@ class Model(pl.LightningModule):
                 return ValueError("MSE is only an option for binary classification.")
             loss = F.cross_entropy(logits, targets)
             probs = F.softmax(logits, dim=1).detach().cpu()
-
-        if self.hparams.l1_regularization:
-            if self.hparams.train_fc_only: # hack just for resnet right now
-                params = torch.cat([x.view(-1) for x in self.model.fc.parameters()])
-                loss += self.hparams.l1_regularization * torch.linalg.vector_norm(params, ord=1)
-            else:
-                all_params = torch.cat([x.view(-1) for x in self.model.parameters()])
-                loss += self.hparams.l1_regularization * torch.linalg.vector_norm(all_params, ord=1)
 
         targets = targets.cpu()
 
