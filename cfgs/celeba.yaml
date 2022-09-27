@@ -11,3 +11,4 @@ optimizer: sgd
 refresh_rate: 2600
 resnet_pretrained: True
 resnet_version: 50
+weight_decay: 1e-4

@@ -58,48 +58,30 @@ def experiment(args):
         dm = CelebADisagreement
         args.check_val_every_n_epoch = 15
 
-    args.weight_decay = 1e-4
-    args.resnet_l1_regularization = 0
     args.dropout_prob = 0
     model, _ = main(args, ResNet, dm)
 
     version = model.trainer.logger.version
     args.weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
     args.lr = 1e-2
-    gammas = (0, 0.5, 1)
 
-    for rebalancing, b in zip((False, True), ("", "Balanced ")):
-        for wd in (0, 1e-4):
-            args.weight_decay = wd
-            if wd:
-                lambdas = (0)
-            else:
-                lambdas = (1e-4, 1e-3, 1e-2)
+    for rebalancing, b in zip([False, True], ["", "Balanced "]):
+        print(f"{b}Full Set DFR: {j}")
+        disagreement(args, full_set_dfr=True, rebalancing=rebalancing)
 
-            for lmbda in lambdas:
-                if wd:
-                    j = "L2 1e-4"
-                else:
-                    j = f"L1 {lmbda}"
+        for gamma in [2, 4]:
+            print(f"{b}Misclassification DFR: {j} Gamma {gamma}")
+            disagreement(args, gamma=gamma, misclassification_dfr=True, rebalancing=rebalancing)
 
-                args.resnet_l1_regularization = lmbda
-                print(f"{b}Full Set DFR: {j}")
-                disagreement(args, full_set_dfr=True, rebalancing=rebalancing)
+            args.dropout_prob = 0.5
 
-                for gamma in gammas:
-                    print(f"{b}Misclassification DFR: {j} Gamma {gamma}")
-                    disagreement(args, gamma=gamma, misclassification_dfr=True, rebalancing=rebalancing)
+            print(f"{b}Dropout Disagreement DFR: {j} Gamma {gamma}")
+            disagreement(args, gamma=gamma, rebalancing=rebalancing)
 
-                    args.dropout_prob = 0.5
+            # print(f"{b}Dropout Misclassification DFR: Lambda {lmbda} Gamma {gamma}")
+            # disagreement(args, gamma=gamma, misclassification_dfr=True, rebalancing=rebalancing)
 
-                    print(f"{b}Dropout Disagreement DFR: {j} Gamma {gamma}")
-                    disagreement(args, gamma=gamma, rebalancing=rebalancing)
-
-                    args.dropout_prob = 0
-
-                    # pretty bad, may need to finetune like regular misclassification
-                    # print(f"{b}Dropout Misclassification DFR: Lambda {lmbda} Gamma {gamma} Dropout {dropout} LR {lr}")
-                    # disagreement(args, gamma=gamma, misclassification_dfr=True, rebalancing=rebalancing)
+            args.dropout_prob = 0
 
 if __name__ == "__main__":
     parser = Parser(

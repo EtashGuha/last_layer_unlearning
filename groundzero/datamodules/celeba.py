@@ -195,10 +195,10 @@ class CelebADisagreement(CelebA):
         return self._data_loader(self.dataset_disagreement, shuffle=True)
 
     def rebalance_groups(self, indices, dataset):
-        g1 = np.intersect1d(indices, dataloader.dataset.nonblond_women)
-        g2 = np.intersect1d(indices, dataloader.dataset.nonblond_men)
-        g3 = np.intersect1d(indices, dataloader.dataset.blond_women)
-        g4 = np.intersect1d(indices, dataloader.dataset.blond_men)
+        g1 = np.intersect1d(indices, dataset.nonblond_women)
+        g2 = np.intersect1d(indices, dataset.nonblond_men)
+        g3 = np.intersect1d(indices, dataset.blond_women)
+        g4 = np.intersect1d(indices, dataset.blond_men)
 
         m = min(len(g1), len(g2), len(g3), len(g4))
 
@@ -293,17 +293,21 @@ class CelebADisagreement(CelebA):
                     agree_targets.extend(targets[~disagreements].tolist())
 
             # Gets a gamma proportion of agreement points.
-            num_agree = int(self.gamma * len(disagree))
-            c = list(zip(agree, agree_targets))
-            random.shuffle(c)
-            agree, agree_targets = zip(*c)
-            agree = agree[:num_agree]
-            agree_targets = agree_targets[:num_agree]
+            if gamma:
+                num_agree = int(self.gamma * len(disagree))
+                c = list(zip(agree, agree_targets))
+                random.shuffle(c)
+                agree, agree_targets = zip(*c)
+                agree = agree[:num_agree]
+                agree_targets = agree_targets[:num_agree]
+            else: # gamma = 0
+                agree = []
+                disagree = []
 
-            disagree = np.asarray(disagree)
-            disagree_targets = np.asarray(disagree_targets)
-            agree = np.asarray(agree)
-            agree_targets = np.asarray(agree_targets)
+            disagree = np.asarray(disagree, dtype=np.int64)
+            disagree_targets = np.asarray(disagree_targets, dtype=np.int64)
+            agree = np.asarray(agree, dtype=np.int64)
+            agree_targets = np.asarray(agree_targets, dtype=np.int64)
 
             # rebalancing
             # use class labels here

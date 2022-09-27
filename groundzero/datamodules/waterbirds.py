@@ -193,13 +193,13 @@ class WaterbirdsDisagreement(Waterbirds):
             return Subset(dataset, inds)
 
     def disagreement_dataloader(self):
-        return self._data_loader(self.dataset_disagreement, shuffle=True)
+        return self._data_loader(self.dataset_disagreement)
 
     def rebalance_groups(self, indices, dataset):
-        g1 = np.intersect1d(indices, dataloader.dataset.landbirds_on_land)
-        g2 = np.intersect1d(indices, dataloader.dataset.waterbirds_on_water)
-        g3 = np.intersect1d(indices, dataloader.dataset.landbirds_on_water)
-        g4 = np.intersect1d(indices, dataloader.dataset.waterbirds_on_land)
+        g1 = np.intersect1d(indices, dataset.landbirds_on_land)
+        g2 = np.intersect1d(indices, dataset.waterbirds_on_water)
+        g3 = np.intersect1d(indices, dataset.landbirds_on_water)
+        g4 = np.intersect1d(indices, dataset.waterbirds_on_land)
 
         m = min(len(g1), len(g2), len(g3), len(g4))
 
@@ -214,23 +214,23 @@ class WaterbirdsDisagreement(Waterbirds):
 
     def rebalance_classes(self, disagree, agree, disagree_targets, agree_targets):
         for i, t in enumerate((disagree_targets, agree_targets)):
-            if not t:
-                return
+            if len(t) == 0:
+                continue
 
             num_one = np.count_nonzero(t)
             num_zero = len(t) - num_one
             to_remove = abs(num_zero - num_one)
+            if to_remove == 0:
+                continue
+
             if num_zero > num_one:
                 mask = t == 1
             else:
                 mask = t == 0
 
-            counter = 0
-            for j, _ in enumerate(mask):
-                if counter >= to_remove:
-                    mask[j] = True
-                if not mask[j]:
-                    counter += 1
+            false_inds = (~mask).nonzero()[0]
+            keep = np.random.choice(false_inds, len(false_inds) - to_remove, replace=False)
+            mask[keep] = True
             
             if i == 0:
                 disagree = disagree[mask]
@@ -273,6 +273,7 @@ class WaterbirdsDisagreement(Waterbirds):
                     targets = targets.cuda()
 
                     if not self.dropout:
+                        self.model.eval()
                         logits = self.model(inputs)
                         preds = torch.sigmoid(logits) > 0.5
                     else:
@@ -295,7 +296,7 @@ class WaterbirdsDisagreement(Waterbirds):
                     disagree_targets.extend(targets[disagreements].tolist())
                     agree.extend(inds[~disagreements].tolist())
                     agree_targets.extend(targets[~disagreements].tolist())
-
+            
             # Gets a gamma proportion of agreement points.
             if self.gamma:
                 num_agree = int(self.gamma * len(disagree))
@@ -323,7 +324,6 @@ class WaterbirdsDisagreement(Waterbirds):
         self.dataset_train = Subset(new_set, indices)
 
         # print the numbers of disagreements by category
-        # needs to be changed for disagreement set train
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
             g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
             g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
