@@ -6,6 +6,7 @@ import pandas as pd
 from PIL import Image
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import  Subset
 from torchvision.datasets.utils import download_and_extract_archive
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
@@ -275,14 +276,18 @@ class WaterbirdsDisagreement(Waterbirds):
                     if not self.dropout:
                         self.model.eval()
                         logits = self.model(inputs)
-                        preds = torch.sigmoid(logits) > 0.5
+                        probs = F.softmax(logits, dim=1)
+                        preds = torch.argmax(probs, dim=1)
                     else:
                         self.model.eval()
                         orig_logits = self.model(inputs)
-                        orig_preds = torch.sigmoid(orig_logits) > 0.5
+                        orig_probs = F.softmax(orig_logits, dim=1)
+                        orig_preds = torch.argmax(orig_probs, dim=1)
+
                         self.model.train()
                         logits = self.model(inputs)
-                        preds = torch.sigmoid(logits) > 0.5
+                        probs = F.softmax(logits, dim=1)
+                        preds = torch.argmax(probs, dim=1)
 
                     if self.misclassification_dfr:
                         disagreements = to_np(torch.logical_xor(preds, targets))
@@ -317,6 +322,15 @@ class WaterbirdsDisagreement(Waterbirds):
             # rebalancing
             # use class labels here
             if self.rebalancing:
+                # print the numbers of disagreements by category
+                print("Pre-balancing numbers")
+                for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
+                    g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
+                    g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
+                    g3 = len(np.intersect1d(x, new_set.landbirds_on_water))
+                    g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
+                    print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
+
                 disagree, agree = self.rebalance_classes(disagree, agree, disagree_targets, agree_targets)
                             
             indices = np.concatenate((disagree, agree))

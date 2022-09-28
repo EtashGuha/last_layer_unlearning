@@ -57,17 +57,30 @@ class Model(pl.LightningModule):
         if isinstance(logits, (tuple, list)):
             logits = torch.squeeze(logits[0], dim=-1)
 
+        if self.hparams.class_weights:
+            weights = torch.tensor(self.hparams.class_weights, device=logits.device)
+        else:
+            weights = torch.ones(self.hparams.num_classes, device=logits.device)
+
+        loss = F.cross_entropy(logits, targets, weight=weights)
+        probs = F.softmax(logits, dim=1).detach().cpu()
+
+        # TODO: Fix MSE for 2-class (actually 1-class) outputs
+        """
         if self.hparams.num_classes == 1:
             if self.hparams.loss == "mse":
+                if self.hparams.class_weights:
+                    raise ValueError("Cannot use class weights with MSE.")
                 loss = F.mse_loss(logits, targets.float())
             else:
-                loss = F.binary_cross_entropy_with_logits(logits, targets.float())
+                loss = F.binary_cross_entropy_with_logits(logits, targets.float(), weight=weights)
             probs = torch.sigmoid(logits).detach().cpu()
         else:
             if self.hparams.loss == "mse":
-                return ValueError("MSE is only an option for binary classification.")
-            loss = F.cross_entropy(logits, targets)
+                raise ValueError("MSE is only an option for binary classification.")
+            loss = F.cross_entropy(logits, targets, weight=weights)
             probs = F.softmax(logits, dim=1).detach().cpu()
+        """
 
         targets = targets.cpu()
 

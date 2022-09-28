@@ -22,6 +22,7 @@ def parse_args():
 def add_input_args(parser):
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
+    parser.add("--class_weights", default=[], nargs="*", type=float)
     parser.add("--cnn_batchnorm", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--cnn_initial_width", default=32, type=int)
     parser.add("--cnn_kernel_size", default=3, type=int)
@@ -55,7 +56,7 @@ def add_input_args(parser):
     parser.add("--resnet_version", choices=[18, 34, 50, 101, 152], default=18, type=int)
     parser.add("--resume_training", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--resume_weights", default=False, type=lambda x: bool(strtobool(x)))
-    parser.add("--seed", default=42, type=int)
+    parser.add("--seed", default=1, type=int)
     parser.add("--train_fc_only", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--val_split", default=0.2, type=float)
     parser.add("--weights", default="")
