@@ -9,6 +9,7 @@ from PIL import Image
 import wget
 
 import torch
+import torch.nn.functional as F
 from torch.utils.data import  Subset
 from torchvision.datasets.utils import download_file_from_google_drive, extract_archive
 from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
@@ -192,7 +193,7 @@ class CelebADisagreement(CelebA):
             return Subset(dataset, inds)
 
     def disagreement_dataloader(self):
-        return self._data_loader(self.dataset_disagreement, shuffle=True)
+        return self._data_loader(self.dataset_disagreement)
 
     def rebalance_groups(self, indices, dataset):
         g1 = np.intersect1d(indices, dataset.nonblond_women)
@@ -213,20 +214,23 @@ class CelebADisagreement(CelebA):
 
     def rebalance_classes(self, disagree, agree, disagree_targets, agree_targets):
         for i, t in enumerate((disagree_targets, agree_targets)):
+            if len(t) == 0:
+                continue
+
             num_one = np.count_nonzero(t)
             num_zero = len(t) - num_one
             to_remove = abs(num_zero - num_one)
+            if to_remove == 0:
+                continue
+
             if num_zero > num_one:
                 mask = t == 1
             else:
                 mask = t == 0
 
-            counter = 0
-            for j, _ in enumerate(mask):
-                if counter >= to_remove:
-                    mask[j] = True
-                if not mask[j]:
-                    counter += 1
+            false_inds = (~mask).nonzero()[0]
+            keep = np.random.choice(false_inds, len(false_inds) - to_remove, replace=False)
+            mask[keep] = True
             
             if i == 0:
                 disagree = disagree[mask]
@@ -269,15 +273,20 @@ class CelebADisagreement(CelebA):
                     targets = targets.cuda()
 
                     if not self.dropout:
+                        self.model.eval()
                         logits = self.model(inputs)
-                        preds = torch.sigmoid(logits) > 0.5
+                        probs = F.softmax(logits, dim=1)
+                        preds = torch.argmax(probs, dim=1)
                     else:
                         self.model.eval()
                         orig_logits = self.model(inputs)
-                        orig_preds = torch.sigmoid(orig_logits) > 0.5
+                        orig_probs = F.softmax(orig_logits, dim=1)
+                        orig_preds = torch.argmax(orig_probs, dim=1)
+
                         self.model.train()
                         logits = self.model(inputs)
-                        preds = torch.sigmoid(logits) > 0.5
+                        probs = F.softmax(logits, dim=1)
+                        preds = torch.argmax(probs, dim=1)
 
                     if self.misclassification_dfr:
                         disagreements = to_np(torch.logical_xor(preds, targets))
@@ -293,16 +302,16 @@ class CelebADisagreement(CelebA):
                     agree_targets.extend(targets[~disagreements].tolist())
 
             # Gets a gamma proportion of agreement points.
-            if gamma:
+            if self.gamma:
                 num_agree = int(self.gamma * len(disagree))
                 c = list(zip(agree, agree_targets))
                 random.shuffle(c)
                 agree, agree_targets = zip(*c)
                 agree = agree[:num_agree]
                 agree_targets = agree_targets[:num_agree]
-            else: # gamma = 0
+            else: # gamma == 0
                 agree = []
-                disagree = []
+                agree_targets = []
 
             disagree = np.asarray(disagree, dtype=np.int64)
             disagree_targets = np.asarray(disagree_targets, dtype=np.int64)
@@ -312,13 +321,22 @@ class CelebADisagreement(CelebA):
             # rebalancing
             # use class labels here
             if self.rebalancing:
+                # print the numbers of disagreements by category
+                 print("Pre-balancing numbers")
+                 for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
+                     g1 = len(np.intersect1d(x, new_set.nonblond_women))
+                     g2 = len(np.intersect1d(x, new_set.nonblond_men))
+                     g3 = len(np.intersect1d(x, new_set.blond_women))
+                     g4 = len(np.intersect1d(x, new_set.blond_men))
+                     print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
+
                 disagree, agree = self.rebalance_classes(disagree, agree, disagree_targets, agree_targets)
                             
             indices = np.concatenate((disagree, agree))
-            self.dataset_train = Subset(new_set, indices)
+
+        self.dataset_train = Subset(new_set, indices)
 
         # print the numbers of disagreements by category
-        # needs to be changed for disagreement set train
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
             g1 = len(np.intersect1d(x, new_set.nonblond_women))
             g2 = len(np.intersect1d(x, new_set.nonblond_men))

@@ -12,14 +12,13 @@ from groundzero.models.resnet import ResNet
 
 def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False, rebalancing=True, dropout=0, class_weights=[1., 1.], dfr_epochs=100):
     disagreement_args = deepcopy(args)
-    disagreement_args.train_fc_only = True
-    disagreement_args.max_epochs = dfr_epochs
-    disagreement_args.check_val_every_n_epoch = dfr_epochs
     disagreement_args.dropout_prob = dropout
-
     model = load_model(disagreement_args, ResNet)
 
     finetune_args = deepcopy(args)
+    finetune_args.train_fc_only = True
+    finetune_args.check_val_every_n_epoch = dfr_epochs
+    finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
     if args.finetune_weights:
         finetune_args.weights = args.finetune_weights
@@ -42,7 +41,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False,
         class CelebADisagreement2(CelebADisagreement):
             def __init__(self, args):
                 super().__init__(
-                    args,
+                    disagreement_args,
                     model=model,
                     gamma=gamma,
                     misclassification_dfr=misclassification_dfr,
@@ -142,7 +141,7 @@ if __name__ == "__main__":
     parser = Trainer.add_argparse_args(parser)
     parser.add("--disagreement_set", choices=("train", "val"))
     parser.add("--disagreement_proportion", type=float)
-    parser.add("--disagreement_from_early_stop_epochs", default=0)
+    parser.add("--disagreement_from_early_stop_epochs", default=0, type=int)
 
     args = parser.parse_args()
     args.num_classes = 1
