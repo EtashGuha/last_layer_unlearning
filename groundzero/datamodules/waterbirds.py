@@ -337,8 +337,9 @@ class WaterbirdsDisagreement(Waterbirds):
 
         self.dataset_train = Subset(new_set, indices)
 
-        # print the numbers of disagreements by category
+        # print the numbers of disagreements by group
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
+            print("Disagreements by group")
             g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
             g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
             g3 = len(np.intersect1d(x, new_set.landbirds_on_water))

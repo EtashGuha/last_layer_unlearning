@@ -322,13 +322,13 @@ class CelebADisagreement(CelebA):
             # use class labels here
             if self.rebalancing:
                 # print the numbers of disagreements by category
-                 print("Pre-balancing numbers")
-                 for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
-                     g1 = len(np.intersect1d(x, new_set.nonblond_women))
-                     g2 = len(np.intersect1d(x, new_set.nonblond_men))
-                     g3 = len(np.intersect1d(x, new_set.blond_women))
-                     g4 = len(np.intersect1d(x, new_set.blond_men))
-                     print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
+                print("Pre-balancing numbers")
+                for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
+                    g1 = len(np.intersect1d(x, new_set.nonblond_women))
+                    g2 = len(np.intersect1d(x, new_set.nonblond_men))
+                    g3 = len(np.intersect1d(x, new_set.blond_women))
+                    g4 = len(np.intersect1d(x, new_set.blond_men))
+                    print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
 
                 disagree, agree = self.rebalance_classes(disagree, agree, disagree_targets, agree_targets)
                             
@@ -336,8 +336,9 @@ class CelebADisagreement(CelebA):
 
         self.dataset_train = Subset(new_set, indices)
 
-        # print the numbers of disagreements by category
+        # print the numbers of disagreements by group
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
+            print("Disagreements by group")
             g1 = len(np.intersect1d(x, new_set.nonblond_women))
             g2 = len(np.intersect1d(x, new_set.nonblond_men))
             g3 = len(np.intersect1d(x, new_set.blond_women))

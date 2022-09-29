@@ -58,7 +58,10 @@ def experiment(args):
     # Hyperparameter search specifications
     CLASS_WEIGHTS = [[1., 1.]]
     if args.disagreement_set == "train":
-        CLASS_WEIGHTS.extend([[1.,2.], [1.,3.], [1.,10.], [1.,100.]])
+        CLASS_WEIGHTS.extend([
+            [1.,2.], [1.,3.], [1.,10.], [1.,100.],
+            [2.,1.], [3.,1.], [10.,1.], [100.,1.],
+        ])
     GAMMAS = [0, 0.5, 1, 2, 4]
     DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
 
