@@ -62,8 +62,10 @@ def experiment(args):
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
-    GAMMAS = [0, 0.5, 1, 2, 4]
-    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    #GAMMAS = [0, 0.5, 1, 2, 4]
+    #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    GAMMAS = [4]
+    DROPOUTS = [0.5]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
@@ -73,7 +75,8 @@ def experiment(args):
         args.check_val_every_n_epoch = args.max_epochs
 
     # should be 50 or 15 epochs model
-    model, _, _ = main(args, ResNet, dm)
+    model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
+    erm_metrics = [erm_val_metrics, erm_test_metrics]
     version = model.trainer.logger.version
 
     # e.g., disagree from 5 epochs but finetune from 50 
@@ -86,6 +89,7 @@ def experiment(args):
         args.finetune_weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
         version = model.trainer.logger.version
 
+    del model
     args.weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
     args.lr = 1e-2
 
@@ -124,6 +128,8 @@ def experiment(args):
                     dropout_metrics = [val_metrics, test_metrics]
 
     print("\n---Hyperparameter Search Results---")
+    print("\nERM:")
+    print(erm_metrics)
     print("\nFull Set DFR:")
     print(full_set_params)
     print(full_set_metrics)

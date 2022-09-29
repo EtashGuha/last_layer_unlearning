@@ -337,8 +337,8 @@ class CelebADisagreement(CelebA):
         self.dataset_train = Subset(new_set, indices)
 
         # print the numbers of disagreements by group
+        print("Disagreements by group")
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
-            print("Disagreements by group")
             g1 = len(np.intersect1d(x, new_set.nonblond_women))
             g2 = len(np.intersect1d(x, new_set.nonblond_men))
             g3 = len(np.intersect1d(x, new_set.blond_women))
