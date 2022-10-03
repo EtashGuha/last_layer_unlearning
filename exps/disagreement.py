@@ -1,5 +1,6 @@
 from configargparse import Parser
 from copy import deepcopy
+import os
 import os.path as osp
 import pickle
 
@@ -110,7 +111,7 @@ def experiment(args):
         ckpt_path = None
         if base_model_resume and "erm_version" in base_model_resume:
             version = base_model_resume["erm_version"]
-            ckpt_path = f"/home/tlabonte3/groundzero/lightning_logs/version_{version}/checkpoints/last.ckpt"
+            ckpt_path = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
         model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm, ckpt_path=ckpt_path)
         version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
@@ -126,7 +127,7 @@ def experiment(args):
     # e.g., disagree from 10 epochs but finetune from 100
     args.finetune_weights = None
     if args.disagreement_from_early_stop_epochs:
-        args.finetune_weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
+        args.finetune_weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
         args.max_epochs = args.disagreement_from_early_stop_epochs
         args.check_val_every_n_epoch = args.max_epochs
 
@@ -143,7 +144,7 @@ def experiment(args):
             with open("disagreement.pkl", "wb") as f:
                 pickle.dump(save_state, f)
 
-    args.weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
+    args.weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
     #args.lr = 1e-2
 
     # load current hyperparam search cfg if needed
