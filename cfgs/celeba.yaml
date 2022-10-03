@@ -5,12 +5,12 @@ data_augmentation: True
 datamodule: celeba
 devices: 1
 lr: 1e-3
-max_epochs: 50
+max_epochs: 40
 model: resnet
 momentum: 0.9
-num_workers: 1
+num_workers: 4
 optimizer: sgd
-refresh_rate: 2600
+refresh_rate: 1000
 resnet_pretrained: True
 resnet_version: 50
 weight_decay: 1e-4

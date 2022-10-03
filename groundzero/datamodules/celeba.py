@@ -324,6 +324,13 @@ class CelebADisagreement(CelebA):
                 agree = agree[:num_agree]
                 agree_targets = agree_targets[:num_agree]
             elif self.gamma < 0: # hack for ablating the disagreement points
+                num_agree = int(abs(self.gamma) * len(disagree))
+                c = list(zip(agree, agree_targets))
+                random.shuffle(c)
+                agree, agree_targets = zip(*c)
+                agree = agree[:num_agree]
+                agree_targets = agree_targets[:num_agree]
+
                 disagree = []
                 disagree_targets = []
             else: # gamma == 0

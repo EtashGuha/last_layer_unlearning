@@ -1,4 +1,5 @@
 import os
+import os.path as osp
 
 from PIL import ImageFile
 
@@ -38,9 +39,14 @@ def load_model(args, model_class):
 
     return model
 
-def load_trainer(args, addtl_callbacks=None):
+def load_trainer(args, addtl_callbacks=None, ckpt_path=None):
+    dirpath=None
+    if ckpt_path:
+        dirpath = osp.split(ckpt_path)[0]
+
     if args.val_split:
         checkpointer = ModelCheckpoint(
+            dirpath=dirpath,
             filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
             monitor="val_loss",
             save_last=True,
@@ -48,6 +54,7 @@ def load_trainer(args, addtl_callbacks=None):
     else:
         args.num_sanity_val_steps = 0
         checkpointer = ModelCheckpoint(
+            dirpath=dirpath,
             filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
             monitor="train_loss",
             save_last=True,
@@ -78,8 +85,8 @@ def main(args, model_class, datamodule_class, callbacks=None, ckpt_path=None, re
             if hasattr(layer, 'reset_parameters'):
                 layer.reset_parameters()
 
-    trainer = load_trainer(args, addtl_callbacks=callbacks)
-        
+    trainer = load_trainer(args, addtl_callbacks=callbacks, ckpt_path=ckpt_path)
+
     trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
     val_metrics = trainer.validate(model, datamodule=datamodule, verbose=False)
     test_metrics = trainer.test(model, datamodule=datamodule)

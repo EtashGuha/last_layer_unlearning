@@ -109,7 +109,7 @@ def experiment(args):
         ckpt_path = None
         if base_model_resume and "erm_version" in base_model_resume:
             version = base_model_resume["erm_version"]
-            ckpt_path = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
+            ckpt_path = f"/home/tlabonte3/groundzero/lightning_logs/version_{version}/checkpoints/last.ckpt"
         model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm, ckpt_path=ckpt_path)
         version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
@@ -241,7 +241,7 @@ def experiment(args):
     print("Gamma Ablation")
     _, gamma_ablation_metrics = disagreement(args, gamma=0, dropout=dropout, class_weights=class_weights)
     print("Dropout Ablation")
-    _, dropout_ablation_metrics = disagreement(args, gamma=-1, dropout=dropout, class_weights=class_weights)
+    _, dropout_ablation_metrics = disagreement(args, gamma=-gamma, dropout=dropout, class_weights=class_weights)
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
