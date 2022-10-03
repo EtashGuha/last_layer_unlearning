@@ -8,7 +8,6 @@ conda create -n groundzero python==3.10
 conda activate groundzero
 conda install pytorch==1.12.1 torchvision==0.13.1 cudatoolkit=11.3 -c pytorch
 python -m pip install -e .
-condor_submit run.cfg
 ```
 
 ### Workflow
