@@ -1,6 +1,6 @@
 accelerator: gpu
-accumulate_grad_batches: 4
-batch_size: 32
+accumulate_grad_batches: 1
+batch_size: 128
 data_augmentation: True
 datamodule: celeba
 devices: 1
