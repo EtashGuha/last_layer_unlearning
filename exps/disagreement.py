@@ -1,5 +1,7 @@
 from configargparse import Parser
 from copy import deepcopy
+import os.path as osp
+import pickle
 
 from pytorch_lightning import Trainer
 
@@ -36,7 +38,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False,
                     dropout=dropout,
                 )
 
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2)
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, reset_fc=True)
     elif args.datamodule == "celeba":
         class CelebADisagreement2(CelebADisagreement):
             def __init__(self, args):
@@ -50,11 +52,37 @@ def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False,
                     dropout=dropout,
                 )
 
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2)
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, reset_fc=True)
 
     return val_metrics, test_metrics
 
 def experiment(args):
+    # instantiate save state
+    if not osp.isfile("disagreement.pkl"):
+        x = {}
+        with open("disagreement.pkl", "wb") as f:
+            pickle.dump(x, f)
+
+    # load save state
+    with open("disagreement.pkl", "rb") as f:
+        save_state = pickle.load(f)
+        cfg = f"{args.seed}{args.datamodule}{args.disagreement_set}{args.disagreement_proportion}{args.disagreement_from_early_stop_epochs}"
+        base_model_cfg = f"{args.seed}{args.datamodule}"
+
+        resume = None
+        if cfg in save_state:
+            resume = save_state[cfg]
+        else:
+            save_state[cfg] = {}
+
+        base_model_resume = None
+        if base_model_cfg in save_state:
+            base_model_resume = save_state[base_model_cfg]
+        else:
+            save_state[base_model_cfg] = {}
+    with open("disagreement.pkl", "wb") as f:
+        pickle.dump(save_state, f)
+
     # Hyperparameter search specifications
     CLASS_WEIGHTS = [[1., 1.]]
     if args.disagreement_set == "train":
@@ -62,42 +90,98 @@ def experiment(args):
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
-    #GAMMAS = [0, 0.5, 1, 2, 4]
-    #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
-    GAMMAS = [4]
-    DROPOUTS = [0.5]
+    GAMMAS = [0, 0.5, 1, 2, 4]
+    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
-        args.check_val_every_n_epoch = args.max_epochs
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
-        args.check_val_every_n_epoch = args.max_epochs
+    args.num_classes = 2
+    args.check_val_every_n_epoch = int(args.max_epochs / 5)
 
-    # should be 50 or 15 epochs model
-    model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
-    erm_metrics = [erm_val_metrics, erm_test_metrics]
-    version = model.trainer.logger.version
+    # full epochs model
+    if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
+        version = base_model_resume["erm_version"]
+        erm_metrics = base_model_resume["erm_metrics"]
+    else:
+        # resume if interrupted (need to manually add version)
+        ckpt_path = None
+        if base_model_resume and "erm_version" in base_model_resume:
+            version = base_model_resume["erm_version"]
+            ckpt_path = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
+        model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm, ckpt_path=ckpt_path)
+        version = model.trainer.logger.version
+        erm_metrics = [erm_val_metrics, erm_test_metrics]
+        del model
 
-    # e.g., disagree from 5 epochs but finetune from 50 
+        with open("disagreement.pkl", "rb") as f:
+            save_state = pickle.load(f)
+        save_state[base_model_cfg]["erm_version"] = version
+        save_state[base_model_cfg]["erm_metrics"] = erm_metrics
+        with open("disagreement.pkl", "wb") as f:
+            pickle.dump(save_state, f)
+ 
+    # e.g., disagree from 10 epochs but finetune from 100
     args.finetune_weights = None
     if args.disagreement_from_early_stop_epochs:
+        args.finetune_weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
         args.max_epochs = args.disagreement_from_early_stop_epochs
         args.check_val_every_n_epoch = args.max_epochs
-        model, _, _ = main(args, ResNet, dm)
 
-        args.finetune_weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
-        version = model.trainer.logger.version
+        if resume and "early_version" in resume:
+            version = resume["early_version"]
+        else:
+            model, _, _ = main(args, ResNet, dm)
+            version = model.trainer.logger.version
+            del model
 
-    del model
+            with open("disagreement.pkl", "rb") as f:
+                save_state = pickle.load(f)
+            save_state[cfg]["early_version"] = version
+            with open("disagreement.pkl", "wb") as f:
+                pickle.dump(save_state, f)
+
     args.weights = f"lightning_logs/version_{version}/checkpoints/last.ckpt"
-    args.lr = 1e-2
+    #args.lr = 1e-2
 
-    # Do hyperparameter search based on worst group validation error
+    # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0
     misclassification_best_worst_group_val = 0
     dropout_best_worst_group_val = 0
-    for class_weights in CLASS_WEIGHTS:
+    if resume and "full_set_best_worst_group_val" in resume and "full_set_params" in resume and "full_set_metrics" in resume:
+        full_set_best_worst_group_val = resume["full_set_best_worst_group_val"]
+        full_set_params = resume["full_set_params"]
+        full_set_metrics = resume["full_set_metrics"]
+    if resume and "misclassification_best_worst_group_val" in resume and "misclassification_params" in resume and "misclassification_metrics" in resume:
+        misclassification_best_worst_group_val = resume["misclassification_best_worst_group_val"]
+        misclassification_params = resume["misclassification_params"]
+        misclassification_metrics = resume["misclassification_metrics"]
+    if resume and "dropout_best_worst_group_val" in resume and "dropout_params" in resume and "dropout_metrics" in resume:
+        dropout_best_worst_group_val = resume["dropout_best_worst_group_val"]
+        dropout_params = resume["dropout_params"]
+        dropout_metrics = resume["dropout_metrics"]
+
+    # load current location in hyperparam search cfg
+    # just outer loop for now
+    start_class_weight_idx = 0
+    if resume and "start_class_weight_idx" in resume:
+        start_class_weight_idx = resume["start_class_weight_idx"]
+
+    # Do hyperparameter search based on worst group validation error
+    for j, class_weights in enumerate(CLASS_WEIGHTS):
+
+        # skip to the right point if resuming
+        if j < start_class_weight_idx:
+            continue
+
+        # save outer loop location for resuming
+        with open("disagreement.pkl", "rb") as f:
+            save_state = pickle.load(f)
+        save_state[cfg]["start_class_weight_idx"] = j
+        with open("disagreement.pkl", "wb") as f:
+            pickle.dump(save_state, f)
+
         print(f"Balanced Full Set DFR: Class Weights {class_weights}")
         val_metrics, test_metrics = disagreement(args, full_set_dfr=True, class_weights=class_weights)
 
@@ -106,6 +190,14 @@ def experiment(args):
             full_set_best_worst_group_val = best_worst_group_val
             full_set_params = [class_weights]
             full_set_metrics = [val_metrics, test_metrics]
+
+            with open("disagreement.pkl", "rb") as f:
+                save_state = pickle.load(f)
+            save_state[cfg]["full_set_best_worst_group_val"] = full_set_best_worst_group_val
+            save_state[cfg]["full_set_params"] = full_set_params
+            save_state[cfg]["full_set_metrics"] = full_set_metrics
+            with open("disagreement.pkl", "wb") as f:
+                pickle.dump(save_state, f)
 
         for gamma in GAMMAS:
             print(f"Balanced Misclassification DFR: Class Weights {class_weights} Gamma {gamma}")
@@ -117,6 +209,14 @@ def experiment(args):
                 misclassification_params = [class_weights, gamma]
                 misclassification_metrics = [val_metrics, test_metrics]
 
+                with open("disagreement.pkl", "rb") as f:
+                    save_state = pickle.load(f)
+                save_state[cfg]["misclassification_best_worst_group_val"] = misclassification_best_worst_group_val
+                save_state[cfg]["misclassification_params"] = misclassification_params
+                save_state[cfg]["misclassification_metrics"] = misclassification_metrics
+                with open("disagreement.pkl", "wb") as f:
+                    pickle.dump(save_state, f)
+
             for dropout in DROPOUTS:
                 print(f"Balanced Dropout Disagreement DFR: Class Weights {class_weights} Gamma {gamma} Dropout {dropout}")
                 val_metrics, test_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights)
@@ -126,6 +226,22 @@ def experiment(args):
                     dropout_best_worst_group_val = best_worst_group_val
                     dropout_params = [class_weights, gamma, dropout]
                     dropout_metrics = [val_metrics, test_metrics]
+
+                    with open("disagreement.pkl", "rb") as f:
+                        save_state = pickle.load(f)
+                    save_state[cfg]["dropout_best_worst_group_val"] = dropout_best_worst_group_val
+                    save_state[cfg]["dropout_params"] = dropout_params
+                    save_state[cfg]["dropout_metrics"] = dropout_metrics
+                    with open("disagreement.pkl", "wb") as f:
+                        pickle.dump(save_state, f)
+
+    class_weights, gamma, dropout = dropout_params
+    print("Rebalancing Ablation")
+    _, rebalancing_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights, rebalancing=False)
+    print("Gamma Ablation")
+    _, gamma_ablation_metrics = disagreement(args, gamma=0, dropout=dropout, class_weights=class_weights)
+    print("Dropout Ablation")
+    _, dropout_ablation_metrics = disagreement(args, gamma=-1, dropout=dropout, class_weights=class_weights)
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
@@ -139,6 +255,12 @@ def experiment(args):
     print("\nDropout Disagreement DFR:")
     print(dropout_params)
     print(dropout_metrics)
+    print("\nRebalancing Ablation w/ Best Dropout Config")
+    print(rebalancing_ablation_metrics)
+    print("\nGamma Ablation w/ Best Dropout Config")
+    print(gamma_ablation_metrics)
+    print("\nDropout Ablation w/ Best Dropout Config")
+    print(dropout_ablation_metrics)
 
 if __name__ == "__main__":
     parser = Parser(
@@ -153,7 +275,6 @@ if __name__ == "__main__":
     parser.add("--disagreement_from_early_stop_epochs", default=0, type=int)
 
     args = parser.parse_args()
-    args.num_classes = 1
 
     experiment(args)
 

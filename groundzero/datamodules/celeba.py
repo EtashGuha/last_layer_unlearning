@@ -282,16 +282,30 @@ class CelebADisagreement(CelebA):
                         orig_logits = self.model(inputs)
                         orig_probs = F.softmax(orig_logits, dim=1)
                         orig_preds = torch.argmax(orig_probs, dim=1)
-
+                        
                         self.model.train()
                         logits = self.model(inputs)
                         probs = F.softmax(logits, dim=1)
                         preds = torch.argmax(probs, dim=1)
 
+                        """ MC Dropout
+                        self.model.train()
+                        disagreements = None
+                        for _ in range(5):
+                            logits = self.model(inputs)
+                            probs = F.softmax(logits, dim=1)
+                            preds = torch.argmax(probs, dim=1)
+                            if disagreements == None:
+                                disagreements = torch.logical_xor(preds, orig_preds)
+                            else:
+                                disagreements = torch.logical_or(torch.logical_xor(preds, orig_preds), disagreements)
+                        """
+
                     if self.misclassification_dfr:
                         disagreements = to_np(torch.logical_xor(preds, targets))
                     elif self.dropout:
                         disagreements = to_np(torch.logical_xor(preds, orig_preds))
+                        #disagreements = to_np(disagreements) # For MC Dropout
                     else:
                         raise ValueError("Can't do disagreement w/o dropout")
 
@@ -302,13 +316,16 @@ class CelebADisagreement(CelebA):
                     agree_targets.extend(targets[~disagreements].tolist())
 
             # Gets a gamma proportion of agreement points.
-            if self.gamma:
+            if self.gamma > 0:
                 num_agree = int(self.gamma * len(disagree))
                 c = list(zip(agree, agree_targets))
                 random.shuffle(c)
                 agree, agree_targets = zip(*c)
                 agree = agree[:num_agree]
                 agree_targets = agree_targets[:num_agree]
+            elif self.gamma < 0: # hack for ablating the disagreement points
+                disagree = []
+                disagree_targets = []
             else: # gamma == 0
                 agree = []
                 agree_targets = []

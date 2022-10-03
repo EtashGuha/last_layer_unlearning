@@ -32,8 +32,8 @@ class WaterbirdsDataset(Dataset):
         land = np.argwhere(background == 0).flatten()
         water = np.argwhere(background == 1).flatten()
         self.landbirds_on_land = np.intersect1d(landbirds, land)
-        self.waterbirds_on_water = np.intersect1d(waterbirds, water)
         self.landbirds_on_water = np.intersect1d(landbirds, water)
+        self.waterbirds_on_water = np.intersect1d(waterbirds, water)
         self.waterbirds_on_land = np.intersect1d(waterbirds, land)
 
         split = np.asarray(metadata_df["split"].values)
@@ -41,25 +41,16 @@ class WaterbirdsDataset(Dataset):
         self.val_indices = np.argwhere(split == 1).flatten()
         self.test_indices = np.argwhere(split == 2).flatten()
 
-        """
-        for n, x in zip(("Train", "Val", "Test"), (self.train_indices, self.val_indices, self.test_indices)):
-            g1 = len(np.intersect1d(x, self.landbirds_on_land))
-            g2 = len(np.intersect1d(x, self.waterbirds_on_water))
-            g3 = len(np.intersect1d(x, self.landbirds_on_water))
-            g4 = len(np.intersect1d(x, self.waterbirds_on_land))
-            print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
-        """
-
         # test_group decides which combo of birds/background to test on. 0 is all.
         if test_group == 1:
             self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_land)
             self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_land)
         elif test_group == 2:
-            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_water)
-            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_water)
-        elif test_group == 3:
             self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_water)
             self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_water)
+        elif test_group == 3:
+            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_water)
+            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_water)
         elif test_group == 4:
             self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_land)
             self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_land)
@@ -198,8 +189,8 @@ class WaterbirdsDisagreement(Waterbirds):
 
     def rebalance_groups(self, indices, dataset):
         g1 = np.intersect1d(indices, dataset.landbirds_on_land)
-        g2 = np.intersect1d(indices, dataset.waterbirds_on_water)
-        g3 = np.intersect1d(indices, dataset.landbirds_on_water)
+        g2 = np.intersect1d(indices, dataset.landbirds_on_water)
+        g3 = np.intersect1d(indices, dataset.waterbirds_on_water)
         g4 = np.intersect1d(indices, dataset.waterbirds_on_land)
 
         m = min(len(g1), len(g2), len(g3), len(g4))
@@ -303,13 +294,16 @@ class WaterbirdsDisagreement(Waterbirds):
                     agree_targets.extend(targets[~disagreements].tolist())
             
             # Gets a gamma proportion of agreement points.
-            if self.gamma:
+            if self.gamma > 0:
                 num_agree = int(self.gamma * len(disagree))
                 c = list(zip(agree, agree_targets))
                 random.shuffle(c)
                 agree, agree_targets = zip(*c)
                 agree = agree[:num_agree]
                 agree_targets = agree_targets[:num_agree]
+            elif self.gamma < 0: # hack for ablating the disagreement points
+                disagree = []
+                disagree_targets = []
             else: # gamma == 0
                 agree = [] 
                 agree_targets = []
@@ -326,8 +320,8 @@ class WaterbirdsDisagreement(Waterbirds):
                 print("Pre-balancing numbers")
                 for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
                     g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
-                    g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
-                    g3 = len(np.intersect1d(x, new_set.landbirds_on_water))
+                    g2 = len(np.intersect1d(x, new_set.landbirds_on_water))
+                    g3 = len(np.intersect1d(x, new_set.waterbirds_on_water))
                     g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
                     print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
 
@@ -341,8 +335,8 @@ class WaterbirdsDisagreement(Waterbirds):
         print("Disagreements by group")
         for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
             g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
-            g2 = len(np.intersect1d(x, new_set.waterbirds_on_water))
-            g3 = len(np.intersect1d(x, new_set.landbirds_on_water))
+            g2 = len(np.intersect1d(x, new_set.landbirds_on_water))
+            g3 = len(np.intersect1d(x, new_set.waterbirds_on_water))
             g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
             print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
 

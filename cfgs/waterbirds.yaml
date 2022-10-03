@@ -4,9 +4,10 @@ data_augmentation: True
 datamodule: waterbirds
 devices: 1
 lr: 1e-3
-max_epochs: 50
+max_epochs: 100
 model: resnet
 momentum: 0.9
+num_workers: 1
 optimizer: sgd
 refresh_rate: 150
 resnet_pretrained: True

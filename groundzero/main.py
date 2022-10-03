@@ -64,17 +64,23 @@ def load_trainer(args, addtl_callbacks=None):
 
     return trainer
 
-def main(args, model_class, datamodule_class, callbacks=None):
+def main(args, model_class, datamodule_class, callbacks=None, ckpt_path=None, reset_fc=False):
+    print(f"Global seed set to {args.seed}")
     seed_everything(seed=args.seed, workers=True)
     os.makedirs(args.out_dir, exist_ok=True)
 
     datamodule = load_datamodule(args, datamodule_class)
-    #args.num_classes = 1 if datamodule.num_classes <= 2 else datamodule.num_classes
     args.num_classes = datamodule.num_classes
+
     model = load_model(args, model_class)
+    if reset_fc:
+        for layer in model.model.fc:
+            if hasattr(layer, 'reset_parameters'):
+                layer.reset_parameters()
+
     trainer = load_trainer(args, addtl_callbacks=callbacks)
         
-    trainer.fit(model, datamodule=datamodule)
+    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
     val_metrics = trainer.validate(model, datamodule=datamodule, verbose=False)
     test_metrics = trainer.test(model, datamodule=datamodule)
     
