@@ -258,6 +258,9 @@ class WaterbirdsDisagreement(Waterbirds):
             if self.rebalancing:
                 indices = self.rebalance_groups(indices, new_set)
         else:
+            all_orig_probs = []
+            all_probs = []
+            all_targets = []
             with torch.no_grad():
                 for i, batch in enumerate(dataloader):
                     inputs, targets = batch
@@ -283,16 +286,43 @@ class WaterbirdsDisagreement(Waterbirds):
                     if self.misclassification_dfr:
                         disagreements = to_np(torch.logical_xor(preds, targets))
                     elif self.dropout:
-                        disagreements = to_np(torch.logical_xor(preds, orig_preds))
+                        all_orig_probs.append(orig_probs)
+                        all_probs.append(probs)
+                        all_targets.extend(to_np(targets))
+                        #disagreements = to_np(torch.logical_xor(preds, orig_preds))
+                        #kldiv = F.kl_div(probs, orig_probs, reduction="none")
+                        #print(kldiv.shape)
+                        #disagreements = to_np(torch.topk(kldiv, k=120, dim=1)[1])
+                        #print(disagreements.shape)
                     else:
                         raise ValueError("Can't do disagreement w/o dropout")
 
-                    inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
-                    disagree.extend(inds[disagreements].tolist())
-                    disagree_targets.extend(targets[disagreements].tolist())
-                    agree.extend(inds[~disagreements].tolist())
-                    agree_targets.extend(targets[~disagreements].tolist())
+                    if self.misclassification_dfr:
+                        inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
+                        disagree.extend(inds[disagreements].tolist())
+                        disagree_targets.extend(targets[disagreements].tolist())
+                        agree.extend(inds[~disagreements].tolist())
+                        agree_targets.extend(targets[~disagreements].tolist())
             
+            if self.dropout:
+                all_orig_probs = torch.cat(all_orig_probs)
+                all_probs = torch.cat(all_probs)
+                kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
+                print(kldiv.shape)
+
+                del all_orig_probs
+                del all_probs
+
+                disagreements = to_np(torch.topk(kldiv, k=60)[1])
+                print(disagreements.shape)
+                agreements = to_np(torch.topk(-kldiv, k=60)[1])
+                all_targets = np.asarray(all_targets)
+
+                disagree = all_inds[disagreements].tolist()
+                disagree_targets = all_targets[disagreements].tolist()
+                agree = all_inds[agreements].tolist()
+                agree_targets = all_targets[agreements].tolist()
+
             # Gets a gamma proportion of agreement points.
             if self.gamma > 0:
                 num_agree = int(self.gamma * len(disagree))

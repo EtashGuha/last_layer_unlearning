@@ -85,18 +85,16 @@ def experiment(args):
         pickle.dump(save_state, f)
 
     # Hyperparameter search specifications
-    #CLASS_WEIGHTS = [[1., 1.]]
-    CLASS_WEIGHTS = [[1., 2.], [1., 5.]]
+    CLASS_WEIGHTS = [[1., 1.]]
+    #CLASS_WEIGHTS = [[1., 2.], [1., 5.]]
     if args.disagreement_set == "train":
         CLASS_WEIGHTS.extend([
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
     #GAMMAS = [0, 0.5, 1, 2, 4]
-    #GAMMAS = [8]
     #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
-    #DROPOUTS=[0.9]
-    GAMMAS = [2]
+    GAMMAS = [4]
     DROPOUTS = [0.9]
 
     if args.datamodule == "waterbirds":
@@ -151,8 +149,6 @@ def experiment(args):
                 pickle.dump(save_state, f)
 
     args.weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
-    #args.lr = 1e-2
-
 
     # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0
@@ -173,8 +169,8 @@ def experiment(args):
     # load current location in hyperparam search cfg
     # just outer loop for now
     start_class_weight_idx = 0
-    #if resume and "start_class_weight_idx" in resume:
-    #    start_class_weight_idx = resume["start_class_weight_idx"]
+    if resume and "start_class_weight_idx" in resume:
+        start_class_weight_idx = resume["start_class_weight_idx"]
 
     # Do hyperparameter search based on worst group validation error
     for j, class_weights in enumerate(CLASS_WEIGHTS):
@@ -190,26 +186,27 @@ def experiment(args):
         with open("disagreement.pkl", "wb") as f:
             pickle.dump(save_state, f)
 
-        # hack for experimenting, remove later
-        if j == 0:
-            print(f"Balanced Full Set DFR: Class Weights {class_weights}")
-            val_metrics, test_metrics = disagreement(args, full_set_dfr=True, class_weights=class_weights)
+        """
+        print(f"Balanced Full Set DFR: Class Weights {class_weights}")
+        val_metrics, test_metrics = disagreement(args, full_set_dfr=True, class_weights=class_weights)
 
-            best_worst_group_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-            if best_worst_group_val > full_set_best_worst_group_val:
-                full_set_best_worst_group_val = best_worst_group_val
-                full_set_params = [class_weights]
-                full_set_metrics = [val_metrics, test_metrics]
+        best_worst_group_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+        if best_worst_group_val > full_set_best_worst_group_val:
+            full_set_best_worst_group_val = best_worst_group_val
+            full_set_params = [class_weights]
+            full_set_metrics = [val_metrics, test_metrics]
 
-                with open("disagreement.pkl", "rb") as f:
-                    save_state = pickle.load(f)
-                save_state[cfg]["full_set_best_worst_group_val"] = full_set_best_worst_group_val
-                save_state[cfg]["full_set_params"] = full_set_params
-                save_state[cfg]["full_set_metrics"] = full_set_metrics
-                with open("disagreement.pkl", "wb") as f:
-                    pickle.dump(save_state, f)
+            with open("disagreement.pkl", "rb") as f:
+                save_state = pickle.load(f)
+            save_state[cfg]["full_set_best_worst_group_val"] = full_set_best_worst_group_val
+            save_state[cfg]["full_set_params"] = full_set_params
+            save_state[cfg]["full_set_metrics"] = full_set_metrics
+            with open("disagreement.pkl", "wb") as f:
+                pickle.dump(save_state, f)
+        """
 
         for gamma in GAMMAS:
+            """
             print(f"Balanced Misclassification DFR: Class Weights {class_weights} Gamma {gamma}")
             val_metrics, test_metrics = disagreement(args, gamma=gamma, misclassification_dfr=True, class_weights=class_weights)
 
@@ -226,6 +223,7 @@ def experiment(args):
                 save_state[cfg]["misclassification_metrics"] = misclassification_metrics
                 with open("disagreement.pkl", "wb") as f:
                     pickle.dump(save_state, f)
+            """
 
             for dropout in DROPOUTS:
                 print(f"Balanced Dropout Disagreement DFR: Class Weights {class_weights} Gamma {gamma} Dropout {dropout}")
