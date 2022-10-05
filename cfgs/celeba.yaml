@@ -1,11 +1,11 @@
 accelerator: gpu
-accumulate_grad_batches: 1
-batch_size: 128
+accumulate_grad_batches: 4
+batch_size: 32
 data_augmentation: True
 datamodule: celeba
 devices: 1
 lr: 1e-3
-max_epochs: 40
+max_epochs: 50
 model: resnet
 momentum: 0.9
 num_workers: 4
