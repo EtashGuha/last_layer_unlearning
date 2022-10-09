@@ -1,12 +1,21 @@
-import torch
+"""DataModule for the BinaryMNIST dataset."""
 
+# Imports PyTorch packages.
 from pl_bolts.datasets import MNIST as PLMNIST
+import torch
 from torchvision.transforms import Compose, Normalize, ToTensor
 
+# Imports groundzero packages.
 from groundzero.datamodules.datamodule import DataModule
 
 
 class BinaryMNIST(DataModule):
+    """DataModule for the BinaryMNIST dataset.
+
+    The BinaryMNIST dataset uses the same data as the MNIST dataset, but
+    turns it into a binary classification task between odd and even digits.
+    """
+
     def __init__(self, args):
         super().__init__(args, PLMNIST, 2)
 

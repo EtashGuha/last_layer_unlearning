@@ -1,3 +1,5 @@
+"""Setuptools procedure for building the groundzero package."""
+
 from setuptools import find_packages, setup
 
 with open("requirements.txt") as f:
@@ -8,7 +10,10 @@ with open("requirements.txt") as f:
 
 setup(
     name="groundzero",
+    version="1.0",
+    description="Quick and extendable experimentation with vision models for classification",
+    author="Tyler LaBonte",
+    author_email="tlabonte@gatech.edu",
     install_requires=required,
     packages=["groundzero"],
-    version="1.0",
 )

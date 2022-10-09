@@ -1,13 +1,20 @@
+"""Defines configuration parameters for models and datamodules."""
+
+# Imports Python packages.
 from configargparse import Parser
 from distutils.util import strtobool
 
+# Import PyTorch packages.
 from pytorch_lightning import Trainer
 
+# Imports groundzero packages.
 import groundzero.datamodules
 import groundzero.models
 
 
 def parse_args():
+    """Reads configuration file and returns configuration dictionary."""
+
     parser = Parser(
         args_for_setting_config_path=["-c", "--cfg", "--config"],
         config_arg_is_required=True,
@@ -20,6 +27,9 @@ def parse_args():
     return args
 
 def add_input_args(parser):
+    """Loads configuration parameters into given configargparse.Parser."""
+
+    parser.add("--balanced_sampler", type=lambda x: bool(strtobool(x)))
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--class_weights", default=[], nargs="*", type=float)

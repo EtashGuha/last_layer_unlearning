@@ -1,10 +1,22 @@
+"""Network-in-Network (NiN) model implementation."""
+
+# Imports PyTorch packages.
 from torch import nn
 
+# Imports groundzero packages.
 from groundzero.models.model import Model
 
 
 class NiN(Model):
+    """Network-in-Network (NiN) model implementation."""
+
     def __init__(self, args):
+        """Initializes an NiN model.
+
+        Args:
+            args: The configuration dictionary.
+        """
+
         super().__init__(args)
         
         self.model = nn.Sequential()
@@ -28,9 +40,4 @@ class NiN(Model):
 
     def load_msg(self):
         return f"Loading NiN with {self.hparams.nin_num_layers} layers and width {self.hparams.nin_width}."
-    
-    def forward(self, inputs):
-        outputs = self.model(inputs)
-        
-        return outputs
 

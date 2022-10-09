@@ -1,6 +1,10 @@
+"""Multilayer perceptron (MLP) model implementation."""
+
+# Imports PyTorch packages.
 import torch
 from torch import nn
 
+# Imports groundzero packages.
 from groundzero.models.model import Model
 
 
@@ -8,7 +12,15 @@ def relu():
     return nn.ReLU(inplace=True)
 
 class MLP(Model):
+    """MLP model implementation."""
+
     def __init__(self, args):
+        """Initializes an MLP model.
+        
+        Args:
+            args: The configuration dictionary.
+        """
+
         super().__init__(args)
         
         activations = {"relu": relu, "sigmoid": nn.Sigmoid}
@@ -37,6 +49,15 @@ class MLP(Model):
         return f"Loading MLP with {self.hparams.mlp_num_layers} layers and hidden dimension {self.hparams.mlp_hidden_dim}."
 
     def forward(self, inputs):
+        """Predicts using the model.
+
+        Args:
+            inputs: A torch.tensor of model inputs.
+        
+        Returns:
+            The model prediction as a torch.tensor.
+        """
+
         inputs = inputs.reshape(inputs.shape[0], -1)
         outputs = torch.squeeze(self.model(inputs), dim=-1)
 

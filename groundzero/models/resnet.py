@@ -1,12 +1,24 @@
+"""ResNet model implementation."""
+
+# Imports PyTorch packages.
 import torch
 from torch import nn
 import torchvision.models as models
 
+# Imports groundzero packages.
 from groundzero.models.model import Model
 
 
 class ResNet(Model):
+    """ResNet model implementation."""
+
     def __init__(self, args):
+        """Initializes a ResNet model.
+
+        Args:
+            args: The configuration dictionary.
+        """
+
         super().__init__(args)
 
         resnets = {
@@ -22,6 +34,8 @@ class ResNet(Model):
         else:
             self.model = resnets[args.resnet_version](weights=None)
 
+        # TODO: Figure out sizing issue? Supposed to replace conv1 when
+        # images are smaller than ImageNet 224 x 224 (e.g., CIFAR-10)?
         # self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7)
 
         self.model.fc = nn.Sequential(
@@ -42,6 +56,17 @@ class ResNet(Model):
             return f"Loading ResNet{self.hparams.resnet_version} with no pretraining."
 
     def step(self, batch, idx):
+        """Performs a single step of prediction and loss calculation.
+
+        Args:
+            batch: A tuple containing the inputs and targets as torch.tensor.
+            idx: The index of the given batch.
+
+        Returns:
+            A dictionary containing the loss, prediction probabilities, and targets.
+            The probs and targets are moved to CPU to free up GPU memory.
+        """
+
         result = super().step(batch, idx)
 
         if self.hparams.resnet_l1_regularization:
@@ -53,3 +78,4 @@ class ResNet(Model):
                 result["loss"] += self.hparams.resnet_l1_regularization * torch.linalg.vector_norm(all_params, ord=1)
 
         return result
+

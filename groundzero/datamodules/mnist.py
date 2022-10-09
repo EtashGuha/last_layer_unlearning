@@ -1,10 +1,16 @@
+"""DataModule for the MNIST dataset."""
+
+# Imports PyTorch packages.
 from pl_bolts.datasets import MNIST as PLMNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
 
+# Imports groundzero packages.
 from groundzero.datamodules.datamodule import DataModule
 
 
 class MNIST(DataModule):
+    """DataModule for the MNIST dataset."""
+
     def __init__(self, args):
         super().__init__(args, PLMNIST, 10)
 

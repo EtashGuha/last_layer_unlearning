@@ -111,14 +111,16 @@ def experiment(args):
         erm_metrics = {} # because I messed up and deleted disagreement pkl
     else:
         # resume if interrupted (need to manually add version)
-        ckpt_path = None
         if base_model_resume and "erm_version" in base_model_resume:
             version = base_model_resume["erm_version"]
-            ckpt_path = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
-        model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm, ckpt_path=ckpt_path)
-        if not ckpt_path:
+            args.weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
+            args.resume_training = True
+        model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
+        if not args.resume_training:
             version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
+        args.weights = ""
+        args.resume_training = ""
         del model
 
         with open("disagreement.pkl", "rb") as f:
@@ -186,7 +188,6 @@ def experiment(args):
         with open("disagreement.pkl", "wb") as f:
             pickle.dump(save_state, f)
 
-        """
         print(f"Balanced Full Set DFR: Class Weights {class_weights}")
         val_metrics, test_metrics = disagreement(args, full_set_dfr=True, class_weights=class_weights)
 
@@ -203,10 +204,8 @@ def experiment(args):
             save_state[cfg]["full_set_metrics"] = full_set_metrics
             with open("disagreement.pkl", "wb") as f:
                 pickle.dump(save_state, f)
-        """
 
         for gamma in GAMMAS:
-            """
             print(f"Balanced Misclassification DFR: Class Weights {class_weights} Gamma {gamma}")
             val_metrics, test_metrics = disagreement(args, gamma=gamma, misclassification_dfr=True, class_weights=class_weights)
 
@@ -223,7 +222,6 @@ def experiment(args):
                 save_state[cfg]["misclassification_metrics"] = misclassification_metrics
                 with open("disagreement.pkl", "wb") as f:
                     pickle.dump(save_state, f)
-            """
 
             for dropout in DROPOUTS:
                 print(f"Balanced Dropout Disagreement DFR: Class Weights {class_weights} Gamma {gamma} Dropout {dropout}")

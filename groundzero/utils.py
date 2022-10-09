@@ -1,9 +1,24 @@
-import torch
+"""Utility functions for groundzero."""
 
+# Imports Python packages.
 import numpy as np
+
+# Imports PyTorch packages.
+import torch
 
 
 def compute_accuracy(probs, targets, num_classes):
+    """Computes top-1 and top-5 accuracies.
+
+    Args:
+        probs: A torch.Tensor of prediction probabilities.
+        targets: A torch.Tensor of classification targets.
+        num_classes: The total number of classes.
+
+    Returns:
+        The top-1 and top-5 accuracies of probs on targets, as torch.Tensors.
+    """
+
     # TODO: Support targets not indexed by range(num_classes).
 
     if num_classes == 1:
@@ -27,6 +42,18 @@ def _to_np(x):
     return x.cpu().detach().numpy()
 
 def to_np(x):
+    """Converts input to numpy array.
+
+    Args:
+        x: A torch.Tensor, np.ndarray, or list.
+
+    Returns:
+        The input converted to a numpy array.
+
+    Raises:
+        ValueError: The input cannot be converted to a numpy array.
+    """
+
     if isinstance(x, torch.Tensor):
         return _to_np(x)
     elif isinstance(x, (np.ndarray, list)):
@@ -35,5 +62,5 @@ def to_np(x):
         else:
             return np.asarray(x)
     else:
-        raise ValueError("Undefined.")
+        raise ValueError("Undefined input.")
 

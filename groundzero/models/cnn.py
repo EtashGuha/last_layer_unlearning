@@ -1,10 +1,18 @@
+"""Convolutional neural network (CNN) model implementation."""
+
+# Imports PyTorch packages.
 from torch import nn
 
+# Imports groundzero packages.
 from groundzero.models.model import Model
 
 
 class CNN(Model):
+    """CNN model implementation."""
+
     def __init__(self, args):
+        """Initializes a CNN model."""
+
         super().__init__(args)
         
         self.model = nn.Sequential()
