@@ -14,17 +14,39 @@ from torchvision.datasets.vision import VisionDataset
 class Dataset(VisionDataset):
     """Parent class for a vision classification dataset.
 
-    Mostly the same as torchvision.VisionDataset with some extra pieces from
-    torchvision.CIFAR10Dataset (e.g., the train flag).
+    Mostly the same as torchvision.datasets.VisionDataset with some extra
+    pieces from torchvision.datasets.CIFAR10Dataset (e.g., the train flag)
+    and support for multiple groups.
 
     Attributes:
-        data: np.ndarray or list containing np.ndarray images or string filenames.
-        targets: np.ndarray or list containing classification targets.
+        root: The location of the dataset on disk.
+        transform: Composition of torchvision.transforms for the image data.
+        target_transform: Composition of torchvision.transforms for the targets.
+        data: np.ndarray containing np.ndarray images or string filenames.
+        targets: np.ndarray containing classification targets.
         train: Whether the dataset should be loaded in train mode (for transforms, etc.).
+        train_indices: Optional np.ndarray of indices of train set.
+        val_indices: Optional np.ndarray of indices of val set.
+        test_indices: Optional np.ndarray of indices of test set.
+        group: If the dataset has multiple groups, specifies which one to initialize.
+        groups: If the dataset has multiple groups, lists indices belonging to each group.
     """
 
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+    def __init__(
+        self,
+        root,
+        train=True,
+        transform=None,
+        target_transform=None, 
+        download=False,
+        group=0,
+    ):
         """Initializes a Dataset and downloads to disk if requested.
+
+        If train_indices, etc. are None, then DataModule will do a random split
+        based on args.val_split. The np.ndarrays self.data and self.targets
+        should hold both training and validation data when train=True and only
+        test data when train=False. The split is calculated in the DataModule.
 
         Args:
             root: The location of the dataset on disk.
@@ -32,17 +54,44 @@ class Dataset(VisionDataset):
             transform: Composition of torchvision.transforms for the image data.
             target_transform: Composition of torchvision.transforms for the targets.
             download: Whether to download the dataset to disk.
+            group: If the dataset has multiple groups, specifies which one to initialize.
         """
 
-        super().__init__(root, transform=transform, target_transform=target_transform)
+        super().__init__(
+            root,
+            transform=transform,
+            target_transform=target_transform,
+        )
+
+        self.train = train
+        self.group = group
 
         self.data = None
         self.targets = None
-        self.train = train
-        
+        self.train_indices = None
+        self.val_indices = None
+        self.test_indices = None
+        self.groups = None
+
         if download:
             self.download()
-        
+
+        self.load_data()
+
+        if self.groups and self.val_indices:
+            self.val_indices = np.intersect1d(self.groups[group], self.val_indices)
+        if self.groups and self.test_indices:
+            self.test_indices = np.intersect1d(self.groups[group], self.test_indices)
+
+        if self.data and self.targets:
+            if self.train_indices and self.val_indices and self.train:
+                indices = np.concatenate([self.train_indices, self.val_indices])
+                self.data = self.data[indices]
+                self.targets = self.targets[indices]
+            elif self.test_indices and not self.train:
+                self.data = self.data[self.test_indices]
+                self.targets = self.targets[self.test_indices]
+                
     def __len__(self):
         return len(self.data)
 
@@ -65,5 +114,9 @@ class Dataset(VisionDataset):
 
     @abstractmethod
     def download(self):
-        pass
+        """Downloads dataset to disk."""
+
+    @abstractmethod
+    def load_data(self):
+        """Initializes self.data and self.targets, and optionally indices and groups."""
 

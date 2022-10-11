@@ -130,6 +130,19 @@ class Model(pl.LightningModule):
 
         return {"loss": loss, "probs": probs, "targets": targets}
 
+    def log_helper(name, value, on_step=True, add_dataloader_idx=True):
+        """Compresses calls to self.log."""
+
+        self.log(
+            name,
+            value,
+            on_step=on_step,
+            on_epoch=True,
+            prog_bar=True,
+            sync_dist=True,
+            add_dataloader_idx=add_dataloader_idx,
+        )
+
     def training_step(self, batch, idx, dataloader_idx=0):
         """Performs a single training step.
 
@@ -144,14 +157,18 @@ class Model(pl.LightningModule):
             
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
+        acc1, acc5 = compute_accuracy(
+            result["probs"],
+            result["targets"],
+            self.hparams.num_classes,
+        )
         result["acc1"] = acc1
 
         # Logs losses and accuracies.
         if dataloader_idx == 0:
-            self.log("train_loss", result["loss"], on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, add_dataloader_idx=False)
-        self.log("train_acc1", acc1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("train_acc5", acc5, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log_helper("train_loss", result["loss"], on_step=False, add_dataloader_idx=False)
+        self.log_helper("train_acc1", acc1, on_step=False)
+        self.log_helper("train_acc5", acc5, on_step=False)
 
         return result
 
@@ -166,7 +183,8 @@ class Model(pl.LightningModule):
             # Only compute training accuracy for the first/main DataLoader.
             training_step_outputs = training_step_outputs[0]
 
-        self.train_acc1 = torch.stack([result["acc1"] for result in training_step_outputs]).mean().item()
+        train_acc1 = [result["acc1"] for result in training_step_outputs]
+        self.train_acc1 = torch.stack(train_acc1).mean().item()
 
     def validation_step(self, batch, idx, dataloader_idx=0):
         """Performs a single validation step.
@@ -182,14 +200,18 @@ class Model(pl.LightningModule):
 
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
+        acc1, acc5 = compute_accuracy(
+            result["probs"],
+            result["targets"],
+            self.hparams.num_classes,
+        )
         result["acc1"] = acc1
 
         # Logs losses and accuracies.
         if dataloader_idx == 0:
-            self.log("val_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True, add_dataloader_idx=False)
-        self.log("val_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("val_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log_helper("val_loss", result["loss"], add_dataloader_idx=False)
+        self.log_helper("val_acc1", acc1)
+        self.log_helper("val_acc5", acc5)
 
         return result
 
@@ -204,7 +226,8 @@ class Model(pl.LightningModule):
             # Only compute validation accuracy for the first/main DataLoader.
             validation_step_outputs = validation_step_outputs[0]
 
-        self.val_acc1 = torch.stack([result["acc1"] for result in validation_step_outputs]).mean().item()
+        val_acc1 = [result["acc1"] for result in validation_step_outputs]
+        self.val_acc1 = torch.stack(val_acc1).mean().item()
 
     def test_step(self, batch, idx, dataloader_idx=0):
         """Performs a single validation step.
@@ -221,10 +244,14 @@ class Model(pl.LightningModule):
         result = self.step(batch, idx)
 
         # Logs losses and accuracies.
-        acc1, acc5 = compute_accuracy(result["probs"], result["targets"], self.hparams.num_classes)
-        self.log("test_loss", result["loss"], on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("test_acc1", acc1, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log("test_acc5", acc5, on_epoch=True, prog_bar=True, sync_dist=True)
+        acc1, acc5 = compute_accuracy(
+            result["probs"],
+            result["targets"],
+            self.hparams.num_classes,
+        )
+        self.log_helper("test_loss", result["loss"])
+        self.log_helper("test_acc1", acc1)
+        self.log_helper("test_acc5", acc5)
 
         return result
 

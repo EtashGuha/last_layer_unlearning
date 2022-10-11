@@ -15,10 +15,8 @@ from pytorch_lightning.utilities.seed import seed_everything
 import torch
 
 # Imports groundzero packages.
-import groundzero
 from groundzero.args import parse_args
-from groundzero.datamodules import *
-from groundzero.models import *
+from groundzero.utils import valid_models_and_datamodules
 
 # Prevents PIL from throwing invalid error on large image files.
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -154,19 +152,8 @@ def main(args, model_class, datamodule_class, callbacks=None, reset_fc=False):
 
 if __name__ == "__main__":
     args = parse_args()
-
-    # Dynamically gets valid input names for models and datamodules based on
-    # the classes located in groundzero.models and groundzero.datamodules.
-    valid_models = [n for n in groundzero.models.__all__ if n != "model"]
-    valid_datamodules = [n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")]
-
-    models = [groundzero.models.__dict__[name].__dict__ for name in valid_models]
-    models = [dict((k.lower(), v) for k, v in d.items()) for d in models]
-    models = {name: models[j][name.replace("_", "")] for j, name in enumerate(valid_models)} 
-
-    datamodules = [groundzero.datamodules.__dict__[name].__dict__ for name in valid_datamodules]
-    datamodules = [dict((k.lower(), v) for k, v in d.items()) for d in datamodules]
-    datamodules = {name: datamodules[j][name.replace("_", "")] for j, name in enumerate(valid_datamodules)} 
+    
+    models, datamodules = valid_models_and_datamodules()
 
     main(args, models[args.model], datamodules[args.datamodule])
 

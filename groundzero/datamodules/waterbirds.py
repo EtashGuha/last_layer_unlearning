@@ -1,26 +1,57 @@
+"""Dataset and DataModule for the Waterbirds dataset."""
+
+# Imports Python builtins.
 import os.path as osp
 import random
 
+# Imports Python packages.
 import numpy as np
 import pandas as pd
 from PIL import Image
 
+# Imports PyTorch packages.
 import torch
 import torch.nn.functional as F
-from torch.utils.data import  Subset
+from torch.utils.data import Subset
 from torchvision.datasets.utils import download_and_extract_archive
-from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
+from torchvision.transforms import (
+    CenterCrop,
+    Compose,
+    Normalize,
+    RandomHorizontalFlip,
+    RandomResizedCrop,
+    Resize,
+    ToTensor,
+)
 
+# Imports groundzero packages.
 from groundzero.datamodules.dataset import Dataset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
 
 class WaterbirdsDataset(Dataset):
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, test_group=0):
-        super().__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
+    """Dataset for the Waterbirds dataset."""
 
-        waterbirds_dir = osp.join(root, "waterbirds")
+    def __init__(*args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def download(self):
+        waterbirds_dir = osp.join(self.root, "waterbirds")
+        if not osp.isdir(waterbirds_dir):
+            url = (
+                "http://worksheets.codalab.org/rest/bundles/"
+                "0x505056d5cdea4e4eaa0e242cbfe2daa4/contents/blob/"
+            )
+
+            download_and_extract_archive(
+                url,
+                waterbirds_dir,
+                filename="waterbirds.tar.gz",
+            )
+
+    def load_data(self):
+        waterbirds_dir = osp.join(self.root, "waterbirds")
         metadata_df = pd.read_csv(osp.join(waterbirds_dir, "metadata.csv"))
         self.data = np.asarray(metadata_df["img_filename"].values)
         self.data = np.asarray([osp.join(waterbirds_dir, d) for d in self.data])
@@ -31,95 +62,25 @@ class WaterbirdsDataset(Dataset):
         waterbirds = np.argwhere(self.targets == 1).flatten()
         land = np.argwhere(background == 0).flatten()
         water = np.argwhere(background == 1).flatten()
-        self.landbirds_on_land = np.intersect1d(landbirds, land)
-        self.landbirds_on_water = np.intersect1d(landbirds, water)
-        self.waterbirds_on_water = np.intersect1d(waterbirds, water)
-        self.waterbirds_on_land = np.intersect1d(waterbirds, land)
 
+        self.groups = [
+            np.arange(len(self.targets)),
+            np.intersect1d(landbirds, land),
+            np.intersect1d(landbirds, water),
+            np.intersect1d(waterbirds, water),
+            np.intersect1d(waterbirds, land),
+        ]
+        
         split = np.asarray(metadata_df["split"].values)
         self.train_indices = np.argwhere(split == 0).flatten()
         self.val_indices = np.argwhere(split == 1).flatten()
         self.test_indices = np.argwhere(split == 2).flatten()
 
-        # test_group decides which combo of birds/background to test on. 0 is all.
-        if test_group == 1:
-            self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_land)
-            self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_land)
-        elif test_group == 2:
-            self.val_indices = np.intersect1d(self.val_indices, self.landbirds_on_water)
-            self.test_indices = np.intersect1d(self.test_indices, self.landbirds_on_water)
-        elif test_group == 3:
-            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_water)
-            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_water)
-        elif test_group == 4:
-            self.val_indices = np.intersect1d(self.val_indices, self.waterbirds_on_land)
-            self.test_indices = np.intersect1d(self.test_indices, self.waterbirds_on_land)
-
-        if not train:
-            self.data = self.data[self.test_indices]
-            self.targets = self.targets[self.test_indices]
-
-    def download(self):
-        waterbirds_dir = osp.join(self.root, "waterbirds")
-        if not osp.isdir(waterbirds_dir):
-            download_and_extract_archive(
-                "http://worksheets.codalab.org/rest/bundles/0x505056d5cdea4e4eaa0e242cbfe2daa4/contents/blob/",
-                waterbirds_dir,
-                filename="waterbirds.tar.gz",
-            )
-
 class Waterbirds(DataModule):
+    """DataModule for the Waterbirds dataset."""
+
     def __init__(self, args):
         super().__init__(args, WaterbirdsDataset, 2)
-
-    def load_msg(self):
-        msg = f"Loading {type(self).__name__} with default val split."
-
-        if self.data_augmentation:
-            msg = msg[:-1] + " and data augmentation."
-        if self.label_noise:
-            msg = msg[:-1] + f" and {int(self.label_noise * 100)}% label noise."
-
-        return msg
-
-    def _split_dataset(self, dataset, train=True):
-        dataset_train = Subset(dataset, dataset.train_indices)
-        dataset_val = Subset(dataset, dataset.val_indices)
-
-        if train:
-            return dataset_train
-        return dataset_val
-
-    def val_dataloader(self):
-        dataloaders = []
-        for group in range(5):
-            dataloaders.append(
-                self._data_loader(
-                    self._split_dataset(
-                        self.dataset_class(
-                            self.data_dir,
-                            train=True,
-                            transform=self.default_transforms(),
-                            test_group=group,
-                        ),
-                        train=False
-            )))
-
-        return dataloaders
-
-    def test_dataloader(self):
-        dataloaders = []
-        for group in range(5):
-            dataloaders.append(
-                self._data_loader(
-                    self.dataset_class(
-                        self.data_dir,
-                        train=False,
-                        transform=self.default_transforms(),
-                        test_group=group,
-            )))
-
-        return dataloaders
 
     def augmented_transforms(self):
         transform = Compose([

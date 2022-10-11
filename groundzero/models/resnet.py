@@ -72,10 +72,11 @@ class ResNet(Model):
         if self.hparams.resnet_l1_regularization:
             if self.hparams.train_fc_only:
                 params = torch.cat([x.view(-1) for x in self.model.fc.parameters()])
-                result["loss"] += self.hparams.resnet_l1_regularization * torch.linalg.vector_norm(params, ord=1)
             else:
-                all_params = torch.cat([x.view(-1) for x in self.model.parameters()])
-                result["loss"] += self.hparams.resnet_l1_regularization * torch.linalg.vector_norm(all_params, ord=1)
+                params = torch.cat([x.view(-1) for x in self.model.parameters()])
+
+            param_l1_norm = torch.linalg.vector_norm(params, ord=1)
+            result["loss"] += self.hparams.resnet_l1_regularization * param_l1_norm
 
         return result
 

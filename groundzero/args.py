@@ -8,8 +8,7 @@ from distutils.util import strtobool
 from pytorch_lightning import Trainer
 
 # Imports groundzero packages.
-import groundzero.datamodules
-import groundzero.models
+from groundzero.utils import valid_model_and_datamodule_names
 
 
 def parse_args():
@@ -29,6 +28,8 @@ def parse_args():
 def add_input_args(parser):
     """Loads configuration parameters into given configargparse.Parser."""
 
+    model_names, datamodule_names = valid_model_and_datamodule_names
+
     parser.add("--balanced_sampler", type=lambda x: bool(strtobool(x)))
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
@@ -40,7 +41,7 @@ def add_input_args(parser):
     parser.add("--cnn_padding", default=0, type=int)
     parser.add("--data_augmentation", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--data_dir", default="data")
-    parser.add("--datamodule", choices=[n for n in groundzero.datamodules.__all__ if n not in ("dataset", "datamodule")])
+    parser.add("--datamodule", choices=datamodule_names)
     parser.add("--dropout_prob", default=0, type=float)
     parser.add("--input_channels", default=3, type=int)
     parser.add("--label_noise", default=0, type=float)
@@ -52,7 +53,7 @@ def add_input_args(parser):
     parser.add("--mlp_hidden_dim", default=256, type=int)
     parser.add("--mlp_input_dim", default=3072, type=int)
     parser.add("--mlp_num_layers", default=3, type=int)
-    parser.add("--model", choices=[n for n in groundzero.models.__all__ if n != "model"])
+    parser.add("--model", choices=model_names)
     parser.add("--momentum", default=0.9, type=float)
     parser.add("--nin_num_layers", default=2, type=int)
     parser.add("--nin_padding", default=1, type=int)

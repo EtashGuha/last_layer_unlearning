@@ -1,29 +1,65 @@
-"""TODO: A lot of this code is the same as Waterbirds. Combine?"""
+"""Dataset and DataModule for the CelebA dataset."""
 
+# Imports Python builtins.
 import os.path as osp
 import random
 
+# Imports Python packages.
 import numpy as np
 import pandas as pd
 from PIL import Image
 import wget
 
+# Imports PyTorch packages.
 import torch
 import torch.nn.functional as F
 from torch.utils.data import  Subset
-from torchvision.datasets.utils import download_file_from_google_drive, extract_archive
-from torchvision.transforms import CenterCrop, Compose, Normalize, RandomHorizontalFlip, RandomResizedCrop, Resize, ToTensor
+from torchvision.datasets.utils import (
+    download_file_from_google_drive,
+    extract_archive,
+)
+from torchvision.transforms import (
+    CenterCrop,
+    Compose,
+    Normalize,
+    RandomHorizontalFlip,
+    RandomResizedCrop,
+    Resize,
+    ToTensor,
+)
 
+# Imports groundzero packages.
 from groundzero.datamodules.dataset import Dataset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
 
 class CelebADataset(Dataset):
-    def __init__(self, root, train=True, transform=None, target_transform=None, download=False, test_group=0):
-        super().__init__(root, train=train, transform=transform, target_transform=target_transform, download=download)
+    """Dataset for the CelebA dataset."""
 
-        celeba_dir = osp.join(root, "celeba")
+    def __init__(*args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def download(self):
+        celeba_dir = osp.join(self.root, "celeba")
+        if not osp.isdir(celeba_dir):
+            # This function can fail if the Google Drive link has received many
+            # recent requests. One may have to download and unzip it manually.
+            download_file_from_google_drive(
+                "0B7EVK8r0v71pZjFTYXZWM3FlRnM",
+                celeba_dir,
+                filename="celeba.zip",
+            )
+            extract_archive(osp.join(celeba_dir, "celeba.zip"))
+
+            url = (
+                "https://github.com/PolinaKirichenko/deep_feature"
+                "_reweighting/blob/main/celeba_metadata.csv"
+            )
+            wget.download(url, out=celeba_dir)
+
+    def load_data(self):
+        celeba_dir = osp.join(self.root, "celeba")
         metadata_df = pd.read_csv(osp.join(celeba_dir, "celeba_metadata.csv"))
         self.data = np.asarray(metadata_df["img_filename"].values)
         self.data = np.asarray([osp.join(celeba_dir, d) for d in self.data])
@@ -34,100 +70,25 @@ class CelebADataset(Dataset):
         blond = np.argwhere(self.targets == 1).flatten()
         women = np.argwhere(gender == 0).flatten()
         men = np.argwhere(gender == 1).flatten()
-        self.nonblond_women = np.intersect1d(nonblond, women)
-        self.nonblond_men = np.intersect1d(nonblond, men)
-        self.blond_women = np.intersect1d(blond, women)
-        self.blond_men = np.intersect1d(blond, men)
+
+        self.groups = [
+            np.arange(len(self.targets)),
+            np.intersect1d(nonblond, women),
+            np.intersect1d(nonblond, men),
+            np.intersect1d(blond, women),
+            np.intersect1d(blond, men),
+        ]
 
         split = np.asarray(metadata_df["split"].values)
         self.train_indices = np.argwhere(split == 0).flatten()
         self.val_indices = np.argwhere(split == 1).flatten()
         self.test_indices = np.argwhere(split == 2).flatten()
-
-        # test_group decides which combo of birds/background to test on. 0 is all.
-        if test_group == 1:
-            self.val_indices = np.intersect1d(self.val_indices, self.nonblond_women)
-            self.test_indices = np.intersect1d(self.test_indices, self.nonblond_women)
-        elif test_group == 2:
-            self.val_indices = np.intersect1d(self.val_indices, self.nonblond_men)
-            self.test_indices = np.intersect1d(self.test_indices, self.nonblond_men)
-        elif test_group == 3:
-            self.val_indices = np.intersect1d(self.val_indices, self.blond_women)
-            self.test_indices = np.intersect1d(self.test_indices, self.blond_women)
-        elif test_group == 4:
-            self.val_indices = np.intersect1d(self.val_indices, self.blond_men)
-            self.test_indices = np.intersect1d(self.test_indices, self.blond_men)
-
-        if not train:
-            self.data = self.data[self.test_indices]
-            self.targets = self.targets[self.test_indices]
-
-    def download(self):
-        celeba_dir = osp.join(self.root, "celeba")
-        if not osp.isdir(celeba_dir):
-            download_file_from_google_drive(
-                "0B7EVK8r0v71pZjFTYXZWM3FlRnM",
-                celeba_dir,
-                filename="celeba.zip",
-            )
-            extract_archive(osp.join(celeba_dir, "celeba.zip"))
-            wget.download(
-                "https://github.com/PolinaKirichenko/deep_feature_reweighting/blob/main/celeba_metadata.csv",
-                out=celeba_dir,
-            )
-
+    
 class CelebA(DataModule):
+    """DataModule for the CelebA dataset."""
+
     def __init__(self, args):
         super().__init__(args, CelebADataset, 2)
-
-    def load_msg(self):
-        msg = f"Loading {type(self).__name__} with default val split."
-
-        if self.data_augmentation:
-            msg = msg[:-1] + " and data augmentation."
-        if self.label_noise:
-            msg = msg[:-1] + f" and {int(self.label_noise * 100)}% label noise."
-
-        return msg
-
-    def _split_dataset(self, dataset, train=True):
-        dataset_train = Subset(dataset, dataset.train_indices)
-        dataset_val = Subset(dataset, dataset.val_indices)
-
-        if train:
-            return dataset_train
-        return dataset_val
-
-    def val_dataloader(self):
-        dataloaders = []
-        for group in range(5):
-            dataloaders.append(
-                self._data_loader(
-                    self._split_dataset(
-                        self.dataset_class(
-                            self.data_dir,
-                            train=True,
-                            transform=self.default_transforms(),
-                            test_group=group,
-                        ),
-                        train=False
-            )))
-
-        return dataloaders
-
-    def test_dataloader(self):
-        dataloaders = []
-        for group in range(5):
-            dataloaders.append(
-                self._data_loader(
-                    self.dataset_class(
-                        self.data_dir,
-                        train=False,
-                        transform=self.default_transforms(),
-                        test_group=group,
-            )))
-
-        return dataloaders
 
     def augmented_transforms(self):
         transform = Compose([

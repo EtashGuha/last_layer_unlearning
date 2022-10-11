@@ -12,7 +12,10 @@ def relu():
     return nn.ReLU(inplace=True)
 
 class MLP(Model):
-    """MLP model implementation."""
+    """MLP model implementation.
+    
+    This version has the same width at every hidden layer.
+    """
 
     def __init__(self, args):
         """Initializes an MLP model.
@@ -46,7 +49,10 @@ class MLP(Model):
                 p.requires_grad = True
 
     def load_msg(self):
-        return f"Loading MLP with {self.hparams.mlp_num_layers} layers and hidden dimension {self.hparams.mlp_hidden_dim}."
+        return (
+            f"Loading MLP with {self.hparams.mlp_num_layers} layers"
+            f" and hidden dimension {self.hparams.mlp_hidden_dim}."
+        )
 
     def forward(self, inputs):
         """Predicts using the model.
