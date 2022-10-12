@@ -30,6 +30,8 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
         class WaterbirdsDisagreement2(WaterbirdsDisagreement):
             def __init__(self, args):
                 super().__init__(
+                    args.disagreement_set,
+                    args.disagreement_proportion,
                     disagreement_args,
                     model=model,
                     gamma=gamma,
@@ -45,6 +47,8 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
         class CelebADisagreement2(CelebADisagreement):
             def __init__(self, args):
                 super().__init__(
+                    args.disagreement_set,
+                    args.disagreement_proportion,
                     disagreement_args,
                     model=model,
                     gamma=gamma,

@@ -43,7 +43,8 @@ class Disagreement(DataModule):
 
     def __init__(
         self,
-        args,
+        disagreement_set,
+        disagreement_proportion,
         *args,
         model=None,
         gamma=1,
@@ -68,8 +69,8 @@ class Disagreement(DataModule):
         super().__init__(*args)
  
         self.model = model.cuda() if model else None
-        self.disagreement_set = args.disagreement_set
-        self.disagreement_proportion = args.disagreement_proportion
+        self.disagreement_set = disagreement_set
+        self.disagreement_proportion = disagreement_proportion
         self.gamma = gamma
         self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
