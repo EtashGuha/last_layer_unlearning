@@ -107,6 +107,7 @@ def experiment(args):
     # full epochs model
     if base_model_resume and "erm_version" in base_model_resume: #and "erm_metrics" in base_model_resume:
         version = base_model_resume["erm_version"]
+        #version = 406
         #erm_metrics = base_model_resume["erm_metrics"]
         erm_metrics = {} # because I messed up and deleted disagreement pkl
     else:

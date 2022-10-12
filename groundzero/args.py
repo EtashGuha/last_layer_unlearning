@@ -28,7 +28,7 @@ def parse_args():
 def add_input_args(parser):
     """Loads configuration parameters into given configargparse.Parser."""
 
-    model_names, datamodule_names = valid_model_and_datamodule_names
+    model_names, datamodule_names = valid_model_and_datamodule_names()
 
     parser.add("--balanced_sampler", type=lambda x: bool(strtobool(x)))
     parser.add("--batch_size", type=int)

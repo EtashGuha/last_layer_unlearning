@@ -15,7 +15,6 @@ from torch.utils.data import Subset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
-# use multiple inheritance for WaterbirdsDisagreement (e.g., from Waterbirds and from Disagreement)?
 
 class Disagreement(DataModule):
     """DataModule for disagreement sets used for deep feature reweighting (DFR).
@@ -38,6 +37,7 @@ class Disagreement(DataModule):
         misclassification_dfr: Whether to perform misclassification DFR.
         dropout_dfr: Whether to perform dropout DFR.
         rebalancing: Whether to class-rebalance the disagreement set.
+        disagreement_ablation: Whether to only use agreement points.
         dataset_disagreement: A groundzero.datamodules.Dataset for disagreement.
     """
 
@@ -50,6 +50,7 @@ class Disagreement(DataModule):
         misclassification_dfr=False,
         dropout_dfr=False,
         rebalancing=False,
+        disagreement_ablation=False,
     ):
         """Initializes a Disagreement DataModule.
         
@@ -60,6 +61,7 @@ class Disagreement(DataModule):
             misclassification_dfr: Whether to perform misclassification DFR.
             dropout_dfr: Whether to perform dropout DFR.
             rebalancing: Whether to class-rebalance the disagreement set.
+            disagreement_ablation: Whether to only use agreement points.
         """
 
         super().__init__(*args)
@@ -68,10 +70,11 @@ class Disagreement(DataModule):
         self.disagreement_set = args.disagreement_set
         self.disagreement_proportion = args.disagreement_proportion
         self.gamma = gamma
+        self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
-        self.full_set_dfr = full_set_dfr
-        self.dropout = dropout
+        self.dropout_dfr = dropout_dfr
         self.rebalancing = rebalancing
+        self.disagreement_ablation = disagreement_ablation
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -200,7 +203,38 @@ class Disagreement(DataModule):
         
         return indices[mask]
 
+    def print_disagreements_by_group(self, dataset, all_inds, disagree, agree):
+        """Prints number of disagreements or agreements occuring in each group.
+        
+        Args:
+            dataset: A groundzero.datamodules.Dataset.
+            all_inds: An np.ndarray of all indices in the disagreement set.
+            disagree: An np.ndarray of all disagreed indices.
+            agree: An np.ndarray of all agreed indices.
+        """
+
+        labels_and_inds = zip(
+            ("All", "Disagreements", "Agreements"),
+            (all_inds, disagree, agree),
+        )
+
+        print("Disagreements by group")
+        for label, inds in labels_and_inds:
+            # Doesn't print for group 0, by convention the group of all indices.
+            nums = []
+            for group in dataset.groups[1:]:
+                nums.append(len(np.intersect1d(inds, group)))
+            print(f"{label}: {nums}")
+
     def disagreement(self):
+        """Computes disagreement set and saves it as self.dataset_train.
+        
+        self.dataset_disagreement is initially the specified self.disagreement_proportion
+        of self.disagreement_set. Here, we perform some computation (i.e., the
+        actual disagreement) on self.dataset_disagreement to get the indices for
+        DFR. Then, we set these indices as self.dataset_train for DFR training.
+        """
+
         dataloader = self.disagreement_dataloader()
 
         new_set = self.dataset_class(
@@ -214,55 +248,65 @@ class Disagreement(DataModule):
         agree = []
         agree_targets = []
 
+        # Gets all the relevant indices from the disagreement set.
         if self.disagreement_set == "train":
             all_inds = dataloader.dataset.train_indices
         elif self.disagreement_set == "val":
             all_inds = dataloader.dataset.val_indices
 
-        if self.full_set_dfr:
+        if self.orig_dfr:
+            # Gets all indices and targets from the disagreement set.
             targets = []
             for batch in dataloader:
                 targets.extend(to_np(batch[1]))
             targets = np.asarray(targets)
             indices = all_inds
 
+            # Performs group balancing on the disagreements for original DFR.
             if self.rebalancing:
                 indices = self.rebalance_groups(indices, new_set)
         else:
             all_orig_probs = []
             all_probs = []
             all_targets = []
+
+            # Performs misclassifiation or dropout disagreements with self.model.
             with torch.no_grad():
                 for i, batch in enumerate(dataloader):
                     inputs, targets = batch
                     inputs = inputs.cuda()
                     targets = targets.cuda()
 
-                    if not self.dropout:
+                    if self.misclassification_dfr:
+                        # Gets predictions from non-dropout model.
                         self.model.eval()
                         logits = self.model(inputs)
                         probs = F.softmax(logits, dim=1)
                         preds = torch.argmax(probs, dim=1)
+
+                        # Gets misclassifications.
+                        disagreements = to_np(torch.logical_xor(preds, targets))
                     else:
+                        # Gets predictions from non-dropout model.
                         self.model.eval()
                         orig_logits = self.model(inputs)
                         orig_probs = F.softmax(orig_logits, dim=1)
                         orig_preds = torch.argmax(orig_probs, dim=1)
 
+                        # Gets predictions from dropout model.
                         self.model.train()
                         logits = self.model(inputs)
                         probs = F.softmax(logits, dim=1)
                         preds = torch.argmax(probs, dim=1)
 
-                    if self.misclassification_dfr:
-                        disagreements = to_np(torch.logical_xor(preds, targets))
-                    elif self.dropout:
-                        #all_orig_probs.append(orig_probs)
-                        #all_probs.append(probs)
-                        #all_targets.extend(to_np(targets))
+                        """
+                        all_orig_probs.append(orig_probs)
+                        all_probs.append(probs)
+                        all_targets.extend(to_np(targets))
+                        """
+
+                        # Gets dropout disagreements.
                         disagreements = to_np(torch.logical_xor(preds, orig_preds))
-                    else:
-                        raise ValueError("Can't do disagreement w/o dropout")
 
                     #if self.misclassification_dfr:
                     inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
@@ -292,60 +336,51 @@ class Disagreement(DataModule):
                 agree_targets = all_targets[agreements].tolist()
             """
 
-            # Gets a gamma proportion of agreement points.
             if self.gamma > 0:
+                # Gets a gamma proportion of agreement points.
                 num_agree = int(self.gamma * len(disagree))
                 c = list(zip(agree, agree_targets))
                 random.shuffle(c)
                 agree, agree_targets = zip(*c)
                 agree = agree[:num_agree]
                 agree_targets = agree_targets[:num_agree]
-            elif self.gamma < 0: # hack for ablating the disagreement points
-                num_agree = int(abs(self.gamma) * len(disagree))
-                c = list(zip(agree, agree_targets))
-                random.shuffle(c)
-                agree, agree_targets = zip(*c)
-                agree = agree[:num_agree]
-                agree_targets = agree_targets[:num_agree]
 
-                disagree = []
-                disagree_targets = []
-            else: # gamma == 0
-                agree = [] 
+                if self.disagreement_ablation:
+                    # Ablates disagreement set (just uses agreement points).
+                    # Note that we still get a gamma proportion of
+                    # agreement points first, to fix the number of data.
+                    disagree = []
+                    disagree_targets = []
+            elif self.gamma == 0:
+                # Ablates agreement set (just uses disagreement points).
+                agree = []
                 agree_targets = []
-
+            else:
+                raise ValueError("Gamma must be non-negative.")
+                
+            # Converts all lists to np.ndarrays.
             disagree = np.asarray(disagree, dtype=np.int64)
             disagree_targets = np.asarray(disagree_targets, dtype=np.int64)
             agree = np.asarray(agree, dtype=np.int64)
             agree_targets = np.asarray(agree_targets, dtype=np.int64)
 
-            # rebalancing
-            # use class labels here
             if self.rebalancing:
-                # print the numbers of disagreements by category
-                print("Pre-balancing numbers")
-                for n, x in zip(("All", "Disagreements", "Agreements"), (all_inds, disagree, agree)):
-                    g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
-                    g2 = len(np.intersect1d(x, new_set.landbirds_on_water))
-                    g3 = len(np.intersect1d(x, new_set.waterbirds_on_water))
-                    g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
-                    print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
+                # Prints number of data in each group prior to balancing.
+                print_disagreements_by_group(new_set, all_inds, disagree, agree)
 
+                # Performs class balancing on the disagreements. Note that the
+                # disagreements and agreements are balanced separately.
                 disagree = self.rebalance_classes(disagree, disagree_targets)
                 agree = self.rebalance_classes(agree, agree_targets)
-                            
+             
+            # Adds disagreement and agreement points to indices.
             indices = np.concatenate((disagree, agree))
 
+        # Uses disagreement set as new training set for DFR.
         self.dataset_train = Subset(new_set, indices)
 
-        # print the numbers of disagreements by group
-        print("Disagreements by group")
-        for n, x in zip(("All", "Disagreements", "Agreements", "Total"), (all_inds, disagree, agree, indices)):
-            g1 = len(np.intersect1d(x, new_set.landbirds_on_land))
-            g2 = len(np.intersect1d(x, new_set.landbirds_on_water))
-            g3 = len(np.intersect1d(x, new_set.waterbirds_on_water))
-            g4 = len(np.intersect1d(x, new_set.waterbirds_on_land))
-            print(f"{n}: ({g1}, {g2}, {g3}, {g4})")
+        # Prints number of data in each group.
+        print_disagreements_by_group(new_set, all_inds, disagree, agree)
 
     def setup(self, stage=None):
         """Instantiates and preprocesses datasets.

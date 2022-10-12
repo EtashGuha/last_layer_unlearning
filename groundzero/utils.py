@@ -7,8 +7,8 @@ import numpy as np
 import torch
 
 # Imports groundzero packages.
-from groundzero.datamodules import *
-from groundzero.models import *
+import groundzero.datamodules
+import groundzero.models
 
 
 def valid_model_and_datamodule_names():
