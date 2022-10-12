@@ -106,6 +106,6 @@ class Waterbirds(DataModule):
 class WaterbirdsDisagreement(Waterbirds, Disagreement):
     """DataModule for the WaterbirdsDisagreement dataset."""
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, args, **kwargs):
+        super().__init__(args, **kwargs)
 

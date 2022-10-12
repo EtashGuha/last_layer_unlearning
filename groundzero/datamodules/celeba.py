@@ -109,6 +109,6 @@ class CelebA(DataModule):
 class CelebADisagreement(CelebA, Disagreement):
     """DataModule for the CelebADisagreement dataset."""
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, args, **kwargs):
+        super().__init__(args, **kwargs)
 
