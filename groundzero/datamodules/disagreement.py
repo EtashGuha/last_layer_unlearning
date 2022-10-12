@@ -43,9 +43,8 @@ class Disagreement(DataModule):
 
     def __init__(
         self,
-        disagreement_set,
-        disagreement_proportion,
-        *args,
+        args,
+        *xargs,
         model=None,
         gamma=1,
         orig_dfr=False,
@@ -57,6 +56,7 @@ class Disagreement(DataModule):
         """Initializes a Disagreement DataModule.
         
         Args:
+            args:
             model: The groundzero.models.Model used for disagreement.
             gamma: The proportion of agreements with which to augment disagreements.
             orig_dfr: Whether to use group labels to perform original DFR.
@@ -66,11 +66,11 @@ class Disagreement(DataModule):
             disagreement_ablation: Whether to only use agreement points.
         """
 
-        super().__init__(*args)
+        super().__init__(*xargs)
  
         self.model = model.cuda() if model else None
-        self.disagreement_set = disagreement_set
-        self.disagreement_proportion = disagreement_proportion
+        self.disagreement_set = args.disagreement_set
+        self.disagreement_proportion = args.disagreement_proportion
         self.gamma = gamma
         self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
