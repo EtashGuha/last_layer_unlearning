@@ -13,7 +13,7 @@ from groundzero.main import load_model, main
 from groundzero.models.resnet import ResNet
 
 
-def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False, rebalancing=True, dropout=0, class_weights=[1., 1.], dfr_epochs=100):
+def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dropout=0, rebalancing=True, class_weights=[1., 1.], dfr_epochs=100, disagreement_ablation=False):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
     model = load_model(disagreement_args, ResNet)
@@ -33,10 +33,11 @@ def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False,
                     disagreement_args,
                     model=model,
                     gamma=gamma,
+                    orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
-                    full_set_dfr=full_set_dfr,
+                    dropout_dfr=(dropout > 0),
                     rebalancing=rebalancing,
-                    dropout=dropout,
+                    disagreement_ablation=disagreement_ablation,
                 )
 
         _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, reset_fc=True)
@@ -47,10 +48,11 @@ def disagreement(args, gamma=1, misclassification_dfr=False, full_set_dfr=False,
                     disagreement_args,
                     model=model,
                     gamma=gamma,
+                    orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
-                    full_set_dfr=full_set_dfr,
+                    dropout_dfr=(dropout > 0),
                     rebalancing=rebalancing,
-                    dropout=dropout,
+                    disagreement_ablation=disagreement_ablation,
                 )
 
         _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, reset_fc=True)
@@ -190,7 +192,7 @@ def experiment(args):
             pickle.dump(save_state, f)
 
         print(f"Balanced Full Set DFR: Class Weights {class_weights}")
-        val_metrics, test_metrics = disagreement(args, full_set_dfr=True, class_weights=class_weights)
+        val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights)
 
         best_worst_group_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
         if best_worst_group_val > full_set_best_worst_group_val:
@@ -246,7 +248,7 @@ def experiment(args):
     print("Rebalancing Ablation")
     _, rebalancing_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights, rebalancing=False)
     print("Gamma Ablation")
-    _, gamma_ablation_metrics = disagreement(args, gamma=0, dropout=dropout, class_weights=class_weights)
+    _, gamma_ablation_metrics = disagreement(args, dropout=dropout, class_weights=class_weights, disagreement_ablation=True)
     print("Dropout Ablation")
     _, dropout_ablation_metrics = disagreement(args, gamma=-gamma, dropout=dropout, class_weights=class_weights)
 

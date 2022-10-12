@@ -83,8 +83,8 @@ class CelebADataset(Dataset):
 class CelebA(DataModule):
     """DataModule for the CelebA dataset."""
 
-    def __init__(self, args):
-        super().__init__(args, CelebADataset, 2)
+    def __init__(self, args, **kwargs):
+        super().__init__(args, CelebADataset, 2, **kwargs)
 
     def augmented_transforms(self):
         transform = Compose([
