@@ -66,7 +66,7 @@ class Disagreement(DataModule):
             disagreement_ablation: Whether to only use agreement points.
         """
 
-        super().__init__(*xargs)
+        super().__init__(args, *xargs)
  
         self.model = model.cuda() if model else None
         self.disagreement_set = args.disagreement_set

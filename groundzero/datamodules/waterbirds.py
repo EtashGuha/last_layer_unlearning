@@ -34,7 +34,7 @@ from groundzero.utils import to_np
 class WaterbirdsDataset(Dataset):
     """Dataset for the Waterbirds dataset."""
 
-    def __init__(*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def download(self):

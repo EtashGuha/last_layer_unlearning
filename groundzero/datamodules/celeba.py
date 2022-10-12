@@ -33,7 +33,7 @@ from groundzero.datamodules.disagreement import Disagreement
 class CelebADataset(Dataset):
     """Dataset for the CelebA dataset."""
 
-    def __init__(*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def download(self):
