@@ -78,17 +78,17 @@ class Dataset(VisionDataset):
 
         self.load_data()
 
-        if self.groups and self.val_indices:
+        if self.groups is not None and self.val_indices is not None:
             self.val_indices = np.intersect1d(self.groups[group], self.val_indices)
-        if self.groups and self.test_indices:
+        if self.groups is not None and self.test_indices is not None:
             self.test_indices = np.intersect1d(self.groups[group], self.test_indices)
 
-        if self.data and self.targets:
-            if self.train_indices and self.val_indices and self.train:
+        if self.data is not None and self.targets is not None:
+            if self.train_indices is not None and self.val_indices is not None and self.train:
                 indices = np.concatenate([self.train_indices, self.val_indices])
                 self.data = self.data[indices]
                 self.targets = self.targets[indices]
-            elif self.test_indices and not self.train:
+            elif self.test_indices is not None and not self.train:
                 self.data = self.data[self.test_indices]
                 self.targets = self.targets[self.test_indices]
                 
