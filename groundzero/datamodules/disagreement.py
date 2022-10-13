@@ -212,7 +212,7 @@ class Disagreement(DataModule):
             agree: An np.ndarray of all agreed indices.
         """
 
-        if indices:
+        if indices is not None:
             labels_and_inds = zip(
                 ("All", "Disagreements", "Agreements", "Final Indices"),
                 (all_inds, disagree, agree, indices),
