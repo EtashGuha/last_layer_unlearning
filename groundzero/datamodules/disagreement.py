@@ -210,11 +210,12 @@ class Disagreement(DataModule):
             all_inds: An np.ndarray of all indices in the disagreement set.
             disagree: An np.ndarray of all disagreed indices.
             agree: An np.ndarray of all agreed indices.
+            indices: An optional np.ndarray of final indices used for DFR.
         """
 
         if indices is not None:
             labels_and_inds = zip(
-                ("All", "Disagreements", "Agreements", "Final Indices"),
+                ("All", "Disagreements", "Agreements", "Final DFR Set"),
                 (all_inds, disagree, agree, indices),
             )
         else:

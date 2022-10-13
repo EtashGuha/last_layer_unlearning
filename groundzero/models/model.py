@@ -179,7 +179,7 @@ class Model(pl.LightningModule):
             training_step_outputs: List of dictionary outputs of self.training_step.
         """
 
-        if len(training_step_outputs) > 1:
+        if isinstance(training_step_outputs[0], list):
             # Only compute training accuracy for the first/main DataLoader.
             training_step_outputs = training_step_outputs[0]
 
@@ -222,7 +222,7 @@ class Model(pl.LightningModule):
             validation_step_outputs: List of dictionary outputs of self.validation_step.
         """
 
-        if len(validation_step_outputs) > 1:
+        if isinstance(validation_step_outputs[0], list)
             # Only compute validation accuracy for the first/main DataLoader.
             validation_step_outputs = validation_step_outputs[0]
 
