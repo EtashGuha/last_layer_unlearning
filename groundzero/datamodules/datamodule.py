@@ -266,7 +266,7 @@ class DataModule(VisionDataModule):
                             self.data_dir,
                             train=False,
                             transform=self.default_transforms(),
-                            test_group=group,
+                            group=group,
                 )))
 
             return dataloaders
