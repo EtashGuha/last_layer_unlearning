@@ -137,7 +137,7 @@ class Model(pl.LightningModule):
             name,
             value,
             on_step=on_step,
-            on_epoch=True,
+            on_epoch=(not on_step),
             prog_bar=True,
             sync_dist=True,
             add_dataloader_idx=add_dataloader_idx,
