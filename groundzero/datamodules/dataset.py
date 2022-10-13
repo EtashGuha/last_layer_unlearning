@@ -116,3 +116,43 @@ class Dataset(VisionDataset):
     def load_data(self):
         """Initializes self.data and self.targets, and optionally indices and groups."""
 
+class Subset(Dataset):
+    """Subset of a Dataset at specified indices.
+    
+    Modified from torch.utils.Subset to allow interactions as if
+    it was a regular dataset (e.g., by indices, groups, etc.).
+    """
+
+    def __init__(self, dataset, indices):
+        self.indices = indices
+        self.root = dataset.root
+        self.transform = dataset.transform
+        self.target_transform = dataset.target_transform
+        self.data = dataset.data[indices]
+        self.targets = dataset.targets[indices]
+        self.train = dataset.train
+        self.train_indices = dataset.train_indices
+        self.val_indices = dataset.val_indices
+        self.test_indices = dataset.test_indices
+        self.group = dataset.group
+        
+        # Gets subsets of train_indices, etc. that are present in indices and
+        # converts them to new indices taking values from 0 to len(indices).
+        if self.train_indices is not None:
+            self.train_indices = np.in1d(self.train_indices, indices).nonzero()[0]
+        if self.val_indices is not None:
+            self.val_indices = np.in1d(self.val_indices, indices).nonzero()[0]
+        if self.test_indices is not None:
+            self.test_indices = np.in1d(self.test_indices, indices).nonzero()[0]
+        if self.groups is not None:
+            self.groups = [
+                np.in1d(group, indices).nonzero()[0]
+                for group in dataset.groups
+            ]
+
+    def __getitem__(self, index):
+        return super().__getitem__(index)
+
+    def __len__(self):
+        return len(self.indices)
+

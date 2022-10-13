@@ -9,9 +9,9 @@ import numpy as np
 # Imports PyTorch packages.
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Subset
 
 # Imports groundzero packages.
+from groundzero.datamodules.dataset import Subset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 

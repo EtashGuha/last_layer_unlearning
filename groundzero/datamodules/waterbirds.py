@@ -2,7 +2,6 @@
 
 # Imports Python builtins.
 import os.path as osp
-import random
 
 # Imports Python packages.
 import numpy as np
@@ -12,7 +11,6 @@ from PIL import Image
 # Imports PyTorch packages.
 import torch
 import torch.nn.functional as F
-from torch.utils.data import Subset
 from torchvision.datasets.utils import download_and_extract_archive
 from torchvision.transforms import (
     CenterCrop,
@@ -28,7 +26,6 @@ from torchvision.transforms import (
 from groundzero.datamodules.dataset import Dataset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.datamodules.disagreement import Disagreement
-from groundzero.utils import to_np
 
 
 class WaterbirdsDataset(Dataset):
