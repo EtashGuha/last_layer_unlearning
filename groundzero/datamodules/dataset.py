@@ -135,6 +135,7 @@ class Subset(Dataset):
         self.val_indices = dataset.val_indices
         self.test_indices = dataset.test_indices
         self.group = dataset.group
+        self.groups = dataset.groups
         
         # Gets subsets of train_indices, etc. that are present in indices and
         # converts them to new indices taking values from 0 to len(indices).
