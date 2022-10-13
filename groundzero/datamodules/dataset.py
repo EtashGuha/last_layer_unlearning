@@ -83,14 +83,10 @@ class Dataset(VisionDataset):
         if self.groups is not None and self.test_indices is not None:
             self.test_indices = np.intersect1d(self.groups[group], self.test_indices)
 
-        if self.data is not None and self.targets is not None:
-            if self.train_indices is not None and self.val_indices is not None and self.train:
-                indices = np.concatenate([self.train_indices, self.val_indices])
-                self.data = self.data[indices]
-                self.targets = self.targets[indices]
-            elif self.test_indices is not None and not self.train:
-                self.data = self.data[self.test_indices]
-                self.targets = self.targets[self.test_indices]
+        if (self.data is not None and self.targets is not None and
+                self.test_indices is not None and not self.train):
+            self.data = self.data[self.test_indices]
+            self.targets = self.targets[self.test_indices]
                 
     def __len__(self):
         return len(self.data)

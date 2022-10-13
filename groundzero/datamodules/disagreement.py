@@ -182,17 +182,14 @@ class Disagreement(DataModule):
             return indices
 
         # Computes the class imbalance of the data.
-        num_one = np.count_nonzero(t)
-        num_zero = len(t) - num_one
+        num_one = np.count_nonzero(targets)
+        num_zero = len(targets) - num_one
         to_remove = abs(num_zero - num_one)
         if to_remove == 0:
             return indices
 
         # Sets locations of minority class to True.
-        if num_zero > num_one:
-            mask = t == 1
-        else:
-            mask = t == 0
+        mask = targets == 1 if num_zero > num_one else targets == 0
 
         # Removes majority class data until they equal the minority class.
         false_inds = (~mask).nonzero()[0]
@@ -238,6 +235,7 @@ class Disagreement(DataModule):
         """
 
         dataloader = self.disagreement_dataloader()
+        batch_size = dataloader.batch_size
 
         new_set = self.dataset_class(
             self.data_dir,
@@ -368,7 +366,7 @@ class Disagreement(DataModule):
 
             if self.rebalancing:
                 # Prints number of data in each group prior to balancing.
-                print_disagreements_by_group(new_set, all_inds, disagree, agree)
+                self.print_disagreements_by_group(new_set, all_inds, disagree, agree)
 
                 # Performs class balancing on the disagreements. Note that the
                 # disagreements and agreements are balanced separately.
@@ -382,7 +380,7 @@ class Disagreement(DataModule):
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.
-        print_disagreements_by_group(new_set, all_inds, disagree, agree)
+        self.print_disagreements_by_group(new_set, all_inds, disagree, agree)
 
     def setup(self, stage=None):
         """Instantiates and preprocesses datasets.
