@@ -202,7 +202,7 @@ class Disagreement(DataModule):
         
         return indices[mask]
 
-    def print_disagreements_by_group(self, dataset, all_inds, disagree, agree):
+    def print_disagreements_by_group(self, dataset, all_inds, disagree, agree, indices=None):
         """Prints number of disagreements or agreements occuring in each group.
         
         Args:
@@ -212,10 +212,16 @@ class Disagreement(DataModule):
             agree: An np.ndarray of all agreed indices.
         """
 
-        labels_and_inds = zip(
-            ("All", "Disagreements", "Agreements"),
-            (all_inds, disagree, agree),
-        )
+        if indices:
+            labels_and_inds = zip(
+                ("All", "Disagreements", "Agreements", "Final Indices"),
+                (all_inds, disagree, agree, indices),
+            )
+        else:
+            labels_and_inds = zip(
+                ("All", "Disagreements", "Agreements"),
+                (all_inds, disagree, agree),
+            )
 
         print("Disagreements by group")
         for label, inds in labels_and_inds:
@@ -380,7 +386,7 @@ class Disagreement(DataModule):
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.
-        self.print_disagreements_by_group(new_set, all_inds, disagree, agree)
+        self.print_disagreements_by_group(new_set, all_inds, disagree, agree, indices=indices)
 
     def setup(self, stage=None):
         """Instantiates and preprocesses datasets.

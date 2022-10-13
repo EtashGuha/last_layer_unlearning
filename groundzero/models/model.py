@@ -130,7 +130,7 @@ class Model(pl.LightningModule):
 
         return {"loss": loss, "probs": probs, "targets": targets}
 
-    def log_helper(name, value, on_step=True, add_dataloader_idx=True):
+    def log_helper(self, name, value, on_step=True, add_dataloader_idx=True):
         """Compresses calls to self.log."""
 
         self.log(
