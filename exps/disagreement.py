@@ -250,7 +250,7 @@ def experiment(args):
     print("Gamma Ablation")
     _, gamma_ablation_metrics = disagreement(args, dropout=dropout, class_weights=class_weights, disagreement_ablation=True)
     print("Dropout Ablation")
-    _, dropout_ablation_metrics = disagreement(args, gamma=-gamma, dropout=dropout, class_weights=class_weights)
+    _, dropout_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights)
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
