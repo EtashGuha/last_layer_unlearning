@@ -124,6 +124,13 @@ class Subset(Dataset):
     """
 
     def __init__(self, dataset, indices):
+        """Initializes a Subset and sets the new indices.
+        
+        Args:
+            dataset: A groundzero.datamodules.Dataset.
+            indices: The indices to utilize in the subset.
+        """
+
         self.indices = indices
         self.root = dataset.root
         self.transform = dataset.transform
