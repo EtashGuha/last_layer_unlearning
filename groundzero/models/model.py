@@ -222,7 +222,7 @@ class Model(pl.LightningModule):
             validation_step_outputs: List of dictionary outputs of self.validation_step.
         """
 
-        if isinstance(validation_step_outputs[0], list)
+        if isinstance(validation_step_outputs[0], list):
             # Only compute validation accuracy for the first/main DataLoader.
             validation_step_outputs = validation_step_outputs[0]
 
