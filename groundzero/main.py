@@ -81,14 +81,14 @@ def load_trainer(args, addtl_callbacks=None):
         An instance of pytorch_lightning.Trainer parameterized by args.
     """
 
-    # Checkpoints model at the specified number of epochs.
-    checkpointer1 = ModelCheckpoint(
-        filename="{epoch:02d}",
-        every_n_epochs=args.ckpt_every_n_epochs,
-        save_last=True,
-    )
-
     if args.val_split:
+        # Checkpoints model at the specified number of epochs.
+        checkpointer1 = ModelCheckpoint(
+            filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
+            every_n_epochs=args.ckpt_every_n_epochs,
+            save_last=True,
+        )
+
         # Checkpoints model with respect to validation loss.
         checkpointer2 = ModelCheckpoint(
             filename="best-{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
@@ -98,6 +98,14 @@ def load_trainer(args, addtl_callbacks=None):
         # Checkpoints model with respect to training loss.
         args.check_val_every_n_epoch = 0
         args.num_sanity_val_steps = 0
+
+        # Checkpoints model at the specified number of epochs.
+        checkpointer1 = ModelCheckpoint(
+            filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
+            every_n_epochs=args.ckpt_every_n_epochs,
+            save_last=True,
+        )
+
         checkpointer2 = ModelCheckpoint(
             filename="best-{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
             monitor="train_loss",

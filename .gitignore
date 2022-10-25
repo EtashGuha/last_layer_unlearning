@@ -12,3 +12,4 @@ out
 __pycache__
 *.sh
 *.tar*
+*.txt

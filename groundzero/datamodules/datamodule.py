@@ -88,6 +88,7 @@ class DataModule(VisionDataModule):
 
         msg = f"Loading {type(self).__name__}"
  
+        # TODO: I don't think this works as intended.
         if hasattr(self, "dataset_val") and self.dataset_val.val_indices:
             msg = msg + " with preset val split."
         elif hasattr(self, "dataset_val"):
