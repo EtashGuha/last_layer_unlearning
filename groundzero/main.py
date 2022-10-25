@@ -81,21 +81,26 @@ def load_trainer(args, addtl_callbacks=None):
         An instance of pytorch_lightning.Trainer parameterized by args.
     """
 
+    # Checkpoints model at the specified number of epochs.
+    checkpointer1 = ModelCheckpoint(
+        filename="{epoch:02d}",
+        every_n_epochs=args.ckpt_every_n_epochs,
+        save_last=True,
+    )
+
     if args.val_split:
         # Checkpoints model with respect to validation loss.
-        checkpointer = ModelCheckpoint(
-            filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
+        checkpointer2 = ModelCheckpoint(
+            filename="best-{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
             monitor="val_loss",
-            save_last=True,
         )
     else:
         # Checkpoints model with respect to training loss.
         args.check_val_every_n_epoch = 0
         args.num_sanity_val_steps = 0
-        checkpointer = ModelCheckpoint(
-            filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
+        checkpointer2 = ModelCheckpoint(
+            filename="best-{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
             monitor="train_loss",
-            save_last=True,
         )
 
     progress_bar = TQDMProgressBar(refresh_rate=args.refresh_rate)
@@ -104,7 +109,7 @@ def load_trainer(args, addtl_callbacks=None):
     args.devices = int(args.devices)
     args.strategy = "ddp" if args.devices > 1 else None
 
-    callbacks = [checkpointer, progress_bar]
+    callbacks = [checkpointer1, checkpointer2, progress_bar]
     if isinstance(addtl_callbacks, list):
         callbacks.extend(addtl_callbacks)
     trainer = Trainer.from_argparse_args(args, callbacks=callbacks)

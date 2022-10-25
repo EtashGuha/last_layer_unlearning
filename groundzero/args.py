@@ -33,6 +33,7 @@ def add_input_args(parser):
     parser.add("--balanced_sampler", type=lambda x: bool(strtobool(x)))
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
+    parser.add("--ckpt_every_n_epochs", default=1, type=int)
     parser.add("--class_weights", default=[], nargs="*", type=float)
     parser.add("--cnn_batchnorm", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--cnn_initial_width", default=32, type=int)

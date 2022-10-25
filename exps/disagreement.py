@@ -87,17 +87,14 @@ def experiment(args):
         pickle.dump(save_state, f)
 
     # Hyperparameter search specifications
-    CLASS_WEIGHTS = [[1., 1.]]
-    #CLASS_WEIGHTS = [[1., 2.], [1., 5.]]
+    CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
     if args.disagreement_set == "train":
         CLASS_WEIGHTS.extend([
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
-    #GAMMAS = [0, 0.5, 1, 2, 4]
-    #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
-    GAMMAS = [4]
-    DROPOUTS = [0.9]
+    GAMMAS = [0, 0.5, 1, 2, 4]
+    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
