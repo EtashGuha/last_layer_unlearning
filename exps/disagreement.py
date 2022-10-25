@@ -101,14 +101,12 @@ def experiment(args):
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
     args.num_classes = 2
-    args.check_val_every_n_epoch = int(args.max_epochs / 5)
+    #args.check_val_every_n_epoch = int(args.max_epochs / 5)
 
     # full epochs model
-    if base_model_resume and "erm_version" in base_model_resume: #and "erm_metrics" in base_model_resume:
+    if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
         version = base_model_resume["erm_version"]
-        #version = 406
-        #erm_metrics = base_model_resume["erm_metrics"]
-        erm_metrics = {} # because I messed up and deleted disagreement pkl
+        erm_metrics = base_model_resume["erm_metrics"]
     else:
         # resume if interrupted (need to manually add version)
         if base_model_resume and "erm_version" in base_model_resume:
