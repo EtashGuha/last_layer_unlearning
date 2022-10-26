@@ -167,7 +167,13 @@ class Model(pl.LightningModule):
         # Logs losses and accuracies.
         if dataloader_idx == 0:
             self.log_helper("train_loss", result["loss"], on_step=True, add_dataloader_idx=False)
-        self.log_helper("train_acc1", acc1, on_step=True)
+            self.log_helper("train_acc1", acc1, on_step=True, add_dataloader_idx=False)
+        try:
+            # Errors if there is only 1 dataloader -- this means we
+            # already logged it, so just pass.
+            self.log_helper("train_acc1", acc1, on_step=True)
+        except:
+            pass
         self.log_helper("train_acc5", acc5, on_step=True)
 
         return result
@@ -210,7 +216,13 @@ class Model(pl.LightningModule):
         # Logs losses and accuracies.
         if dataloader_idx == 0:
             self.log_helper("val_loss", result["loss"], add_dataloader_idx=False)
-        self.log_helper("val_acc1", acc1)
+            self.log_helper("val_acc1", acc1, add_dataloader_idx=False)
+        try:
+            # Errors if there is only 1 dataloader -- this means we
+            # already logged it, so just pass.
+            self.log_helper("val_acc1", acc1)
+        except:
+            pass
         self.log_helper("val_acc5", acc5)
 
         return result

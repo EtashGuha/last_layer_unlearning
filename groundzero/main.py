@@ -85,8 +85,8 @@ def load_trainer(args, addtl_callbacks=None):
         # Checkpoints model at the specified number of epochs.
         checkpointer1 = ModelCheckpoint(
             filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
+            save_top_k=-1,
             every_n_epochs=args.ckpt_every_n_epochs,
-            save_last=True,
         )
 
         # Checkpoints model with respect to validation loss.
@@ -102,8 +102,8 @@ def load_trainer(args, addtl_callbacks=None):
         # Checkpoints model at the specified number of epochs.
         checkpointer1 = ModelCheckpoint(
             filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
+            save_top_k=-1,
             every_n_epochs=args.ckpt_every_n_epochs,
-            save_last=True,
         )
 
         checkpointer2 = ModelCheckpoint(

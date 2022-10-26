@@ -102,8 +102,8 @@ def experiment(args):
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
     args.num_classes = 2
-    args.check_val_every_n_epoch = int(args.max_epochs / 5)
-    args.ckpt_every_n_epochs = int(args.max_epochs / 5)
+    args.check_val_every_n_epoch = int(args.max_epochs / 10)
+    args.ckpt_every_n_epochs = int(args.max_epochs / 10)
 
     # full epochs model
     if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
