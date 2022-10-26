@@ -21,6 +21,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
     finetune_args.check_val_every_n_epoch = dfr_epochs
+    finetune_args.ckpt_every_n_epochs = dfr_epochs
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
     if args.finetune_weights:
@@ -101,7 +102,8 @@ def experiment(args):
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
     args.num_classes = 2
-    #args.check_val_every_n_epoch = int(args.max_epochs / 5)
+    args.check_val_every_n_epoch = int(args.max_epochs / 5)
+    args.ckpt_every_n_epochs = int(args.max_epochs / 5)
 
     # full epochs model
     if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
