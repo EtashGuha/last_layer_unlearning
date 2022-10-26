@@ -157,6 +157,7 @@ def experiment(args):
     if resume and "full_set_best_worst_group_val" in resume and "full_set_params" in resume and "full_set_metrics" in resume:
         full_set_best_worst_group_val = resume["full_set_best_worst_group_val"]
         full_set_params = resume["full_set_params"]
+        full_set_metrics = resume["full_set_metrics"]
     if resume and "misclassification_best_worst_group_val" in resume and "misclassification_params" in resume and "misclassification_metrics" in resume:
         misclassification_best_worst_group_val = resume["misclassification_best_worst_group_val"]
         misclassification_params = resume["misclassification_params"]
