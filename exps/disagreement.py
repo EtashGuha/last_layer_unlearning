@@ -1,5 +1,6 @@
 from configargparse import Parser
 from copy import deepcopy
+from glob import glob
 import os
 import os.path as osp
 import pickle
@@ -113,7 +114,8 @@ def experiment(args):
         # resume if interrupted (need to manually add version)
         if base_model_resume and "erm_version" in base_model_resume:
             version = base_model_resume["erm_version"]
-            args.weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
+            list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
+            args.weights = max(list_of_weights, key=os.path.getctime)
             args.resume_training = True
         model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
         if not args.resume_training:
@@ -133,6 +135,7 @@ def experiment(args):
     # e.g., disagree from 10 epochs but finetune from 100
     args.finetune_weights = None
     if args.disagreement_from_early_stop_epochs:
+        # TODO: CHANGE THIS.
         args.finetune_weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
         args.max_epochs = args.disagreement_from_early_stop_epochs
         args.check_val_every_n_epoch = args.max_epochs
@@ -150,7 +153,8 @@ def experiment(args):
             with open("disagreement.pkl", "wb") as f:
                 pickle.dump(save_state, f)
 
-    args.weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
+    list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
+    args.weights = max(list_of_weights, key=os.path.getctime)
 
     # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0
@@ -242,13 +246,20 @@ def experiment(args):
                     with open("disagreement.pkl", "wb") as f:
                         pickle.dump(save_state, f)
 
+    # save outer loop location for resuming
+    with open("disagreement.pkl", "rb") as f:
+        save_state = pickle.load(f)
+    save_state[cfg]["start_class_weight_idx"] = len(CLASS_WEIGHTS)
+    with open("disagreement.pkl", "wb") as f:
+        pickle.dump(save_state, f)
+
     class_weights, gamma, dropout = dropout_params
     print("Rebalancing Ablation")
     _, rebalancing_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights, rebalancing=False)
     print("Gamma Ablation")
-    _, gamma_ablation_metrics = disagreement(args, dropout=dropout, class_weights=class_weights, disagreement_ablation=True)
+    _, gamma_ablation_metrics = disagreement(args, gamma=0, dropout=dropout, class_weights=class_weights)
     print("Dropout Ablation")
-    _, dropout_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights)
+    _, dropout_ablation_metrics = disagreement(args, gamma=gamma, dropout=dropout, class_weights=class_weights, disagreement_ablation=True)
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
