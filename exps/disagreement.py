@@ -17,6 +17,7 @@ from groundzero.models.resnet import ResNet
 def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dropout=0, rebalancing=True, class_weights=[1., 1.], dfr_epochs=100, disagreement_ablation=False):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
+    disagreement_args.balanced_sampler = True if rebalancing else False
     model = load_model(disagreement_args, ResNet)
 
     finetune_args = deepcopy(args)
@@ -25,6 +26,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
     finetune_args.ckpt_every_n_epochs = dfr_epochs
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
+    #finetune_args.balanced_sampler = True if rebalancing else False
     if args.finetune_weights:
         finetune_args.weights = args.finetune_weights
 
@@ -159,7 +161,6 @@ def experiment(args):
 
     list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
     args.weights = max(list_of_weights, key=os.path.getctime)
-    args.balanced_sampler = True
 
     # for testing
     #val_metrics, test_metrics = disagreement(args, gamma=2, dropout=0.5)
