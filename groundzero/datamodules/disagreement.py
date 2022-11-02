@@ -271,8 +271,11 @@ class Disagreement(DataModule):
 
             # Performs group balancing on the disagreements for original DFR.
             if self.rebalancing:
-                indices = self.rebalance_groups(indices, new_set)
+                #indices = self.rebalance_groups(indices, new_set)
+                pass
         else:
+            all_orig_logits = []
+            all_logits = []
             all_orig_probs = []
             all_probs = []
             all_targets = []
@@ -307,6 +310,8 @@ class Disagreement(DataModule):
                         preds = torch.argmax(probs, dim=1)
 
                         """
+                        all_orig_logits.append(orig_logits)
+                        all_logits.append(logits)
                         all_orig_probs.append(orig_probs)
                         all_probs.append(probs)
                         all_targets.extend(to_np(targets))
@@ -323,18 +328,21 @@ class Disagreement(DataModule):
                     agree_targets.extend(targets[~disagreements].tolist())
             
             """
-            if self.dropout:
+            if not self.misclassification_dfr:
+                all_orig_logits = torch.cat(all_orig_logits)
+                all_logits = torch.cat(all_logits)
                 all_orig_probs = torch.cat(all_orig_probs)
                 all_probs = torch.cat(all_probs)
                 kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
-                print(kldiv.shape)
+                loss = F.cross_entropy(all_logits, all_orig_logits, reduction="none").squeeze()
 
+                del all_orig_logits
+                del all_logits
                 del all_orig_probs
                 del all_probs
 
-                disagreements = to_np(torch.topk(kldiv, k=60)[1])
-                print(disagreements.shape)
-                agreements = to_np(torch.topk(-kldiv, k=60)[1])
+                disagreements = to_np(torch.topk(kldiv, k=39)[1])
+                agreements = to_np(torch.topk(-kldiv, k=39)[1])
                 all_targets = np.asarray(all_targets)
 
                 disagree = all_inds[disagreements].tolist()
@@ -372,6 +380,7 @@ class Disagreement(DataModule):
             agree_targets = np.asarray(agree_targets, dtype=np.int64)
 
             if self.rebalancing:
+                """
                 # Prints number of data in each group prior to balancing.
                 self.print_disagreements_by_group(new_set, all_inds, disagree, agree)
 
@@ -379,11 +388,15 @@ class Disagreement(DataModule):
                 # disagreements and agreements are balanced separately.
                 disagree = self.rebalance_classes(disagree, disagree_targets)
                 agree = self.rebalance_classes(agree, agree_targets)
+                """
+                pass
              
             # Adds disagreement and agreement points to indices.
             indices = np.concatenate((disagree, agree))
 
         # Uses disagreement set as new training set for DFR.
+        if self.disagreement_set == "val":
+            new_set.train_indices = new_set.val_indices
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.

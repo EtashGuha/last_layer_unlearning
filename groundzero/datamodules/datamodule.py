@@ -219,9 +219,11 @@ class DataModule(VisionDataModule):
         if self.balanced_sampler:
             # Instantiates balanced sampler if desired.
             # TODO: Change for if labels are not (0, ..., num_classes).
-            new_set = self.dataset_class(self.data_dir, train=True)
-            subset_indices = new_set.train_indices
-            targets = new_set.targets[subset_indices]
+            #new_set = self.dataset_class(self.data_dir, train=True)
+            #subset_indices = new_set.train_indices
+            #targets = new_set.targets[subset_indices]
+            indices = self.dataset_train.train_indices
+            targets = self.dataset_train.targets[indices]
 
             counts = np.bincount(targets)
             label_weights = 1. / counts
@@ -237,6 +239,7 @@ class DataModule(VisionDataModule):
 
         if len(self.dataset_val.groups):
             # Returns a list of DataLoaders for each group/split.
+            # TODO: Breaks if self.dataset_val is a Subset?
             dataloaders = []
             for group in range(len(self.dataset_val.groups)):
                 dataloaders.append(
@@ -259,6 +262,7 @@ class DataModule(VisionDataModule):
 
         if len(self.dataset_test.groups):
             # Returns a list of DataLoaders for each group/split.
+            # TODO: Breaks if self.dataset_test is a Subset?
             dataloaders = []
             for group in range(len(self.dataset_test.groups)):
                 dataloaders.append(

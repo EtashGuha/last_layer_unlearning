@@ -73,6 +73,9 @@ def experiment(args):
         save_state = pickle.load(f)
         cfg = f"{args.seed}{args.datamodule}{args.disagreement_set}{args.disagreement_proportion}{args.disagreement_from_early_stop_epochs}"
         base_model_cfg = f"{args.seed}{args.datamodule}"
+        if args.balanced_sampler:
+            cfg += "balanced"
+            base_model_cfg += "balanced"
 
         resume = None
         if cfg in save_state:
@@ -89,7 +92,8 @@ def experiment(args):
         pickle.dump(save_state, f)
 
     # Hyperparameter search specifications
-    CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
+    #CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
+    CLASS_WEIGHTS = [[1., 1.]]
     if args.disagreement_set == "train":
         CLASS_WEIGHTS.extend([
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
@@ -155,6 +159,12 @@ def experiment(args):
 
     list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
     args.weights = max(list_of_weights, key=os.path.getctime)
+    args.balanced_sampler = True
+
+    # for testing
+    #val_metrics, test_metrics = disagreement(args, gamma=2, dropout=0.5)
+    #print(test_metrics)
+    #return
 
     # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0

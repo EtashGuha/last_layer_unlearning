@@ -147,11 +147,11 @@ class Subset(Dataset):
         # Gets subsets of train_indices, etc. that are present in indices and
         # converts them to new indices taking values from 0 to len(indices).
         if self.train_indices is not None:
-            self.train_indices = np.in1d(self.train_indices, indices).nonzero()[0]
+            self.train_indices = np.in1d(indices, self.train_indices).nonzero()[0]
         if self.val_indices is not None:
-            self.val_indices = np.in1d(self.val_indices, indices).nonzero()[0]
+            self.val_indices = np.in1d(indices, self.val_indices).nonzero()[0]
         if self.test_indices is not None:
-            self.test_indices = np.in1d(self.test_indices, indices).nonzero()[0]
+            self.test_indices = np.in1d(indices, self.test_indices).nonzero()[0]
         if self.groups is not None:
             self.groups = [
                 np.in1d(group, indices).nonzero()[0]
