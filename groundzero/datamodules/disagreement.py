@@ -9,6 +9,7 @@ import numpy as np
 # Imports PyTorch packages.
 import torch
 import torch.nn.functional as F
+from torch.utils.data import WeightedRandomSampler
 
 # Imports groundzero packages.
 from groundzero.datamodules.dataset import Subset
@@ -36,7 +37,6 @@ class Disagreement(DataModule):
         orig_dfr: Whether to use group labels to perform original DFR.
         misclassification_dfr: Whether to perform misclassification DFR.
         dropout_dfr: Whether to perform dropout DFR.
-        rebalancing: Whether to class-rebalance the disagreement set.
         disagreement_ablation: Whether to only use agreement points.
         dataset_disagreement: A groundzero.datamodules.Dataset for disagreement.
     """
@@ -50,7 +50,6 @@ class Disagreement(DataModule):
         orig_dfr=False,
         misclassification_dfr=False,
         dropout_dfr=False,
-        rebalancing=False,
         disagreement_ablation=False,
     ):
         """Initializes a Disagreement DataModule.
@@ -62,7 +61,6 @@ class Disagreement(DataModule):
             orig_dfr: Whether to use group labels to perform original DFR.
             misclassification_dfr: Whether to perform misclassification DFR.
             dropout_dfr: Whether to perform dropout DFR.
-            rebalancing: Whether to class-rebalance the disagreement set.
             disagreement_ablation: Whether to only use agreement points.
         """
 
@@ -75,7 +73,6 @@ class Disagreement(DataModule):
         self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
         self.dropout_dfr = dropout_dfr
-        self.rebalancing = rebalancing
         self.disagreement_ablation = disagreement_ablation
 
     def load_msg(self):
@@ -132,75 +129,31 @@ class Disagreement(DataModule):
         else:
             return Subset(dataset, inds)
 
+    def train_dataloader(self):
+        """Returns DataLoader for the train dataset (after disagreement)."""
+
+        if self.orig_dfr:
+            # Does group balancing for original DFR.
+            indices = self.dataset_train.train_indices
+            groups = np.zeros(len(indices), dtype=np.int32)
+            for i, x in enumerate(indices):
+                for j, group in enumerate(self.dataset_train.groups[1:]):
+                    if x in group:
+                        groups[i] = j
+
+            counts = np.bincount(groups)
+            label_weights = 1. / counts
+            weights = label_weights[groups]
+            sampler = WeightedRandomSampler(weights, len(weights))
+
+            return self._data_loader(self.dataset_train, sampler=sampler)
+        else:
+            return super().train_dataloader()
+
     def disagreement_dataloader(self):
         """Returns DataLoader for the disagreement set."""
 
         return self._data_loader(self.dataset_disagreement)
-
-    def rebalance_groups(self, indices, dataset):
-        """Uses group labels to balance dataset across groups.
-        
-        Args:
-            indices: An np.ndarray of data indices.
-            dataset: A groundzero.datamodules.Dataset.
-            
-        Returns:
-            An np.ndarray of indices with equal data from each group.
-        """
-
-        # Gets indices corresponding to each group. Does not get indices
-        # for group 0, which is by convention the group of all indices.
-        group_inds = []
-        for group in dataset.groups[1:]:
-            group_inds.append(np.intersect1d(indices, group))
-
-        for g in group_inds:
-            random.shuffle(g)
-
-        # Truncates each group to have the same number of indices.
-        m = min([len(g) for g in group_inds])
-        indices = np.concatenate([g[:m] for g in group_inds])
-
-        return indices
-
-    def rebalance_classes(self, indices, targets):
-        """Uses class labels to balance dataset across classes.
-
-        Args:
-            indices: An np.ndarray of data indices.
-            targets: An np.ndarray of class targets.
-
-        Returns:
-            An np.ndarray of indices with equal data from each class.
-        """
-
-        # TODO: Extend to the case when targets are not consecutive ints.
-        # TODO: Generalize to any number of classes.
-
-        # Skips balancing if the list is empty (e.g., if gamma == 0).
-        if len(targets) == 0:
-            return indices
-
-        # Computes the class imbalance of the data.
-        num_one = np.count_nonzero(targets)
-        num_zero = len(targets) - num_one
-        to_remove = abs(num_zero - num_one)
-        if to_remove == 0:
-            return indices
-
-        # Sets locations of minority class to True.
-        mask = targets == 1 if num_zero > num_one else targets == 0
-
-        # Removes majority class data until they equal the minority class.
-        false_inds = (~mask).nonzero()[0]
-        keep = np.random.choice(
-            false_inds,
-            len(false_inds) - to_remove,
-            replace=False,
-        )
-        mask[keep] = True
-        
-        return indices[mask]
 
     def print_disagreements_by_group(self, dataset, all_inds, disagree, agree, indices=None):
         """Prints number of disagreements or agreements occuring in each group.
@@ -268,11 +221,6 @@ class Disagreement(DataModule):
                 targets.extend(to_np(batch[1]))
             targets = np.asarray(targets)
             indices = all_inds
-
-            # Performs group balancing on the disagreements for original DFR.
-            if self.rebalancing:
-                #indices = self.rebalance_groups(indices, new_set)
-                pass
         else:
             all_orig_logits = []
             all_logits = []
@@ -379,18 +327,6 @@ class Disagreement(DataModule):
             agree = np.asarray(agree, dtype=np.int64)
             agree_targets = np.asarray(agree_targets, dtype=np.int64)
 
-            if self.rebalancing:
-                """
-                # Prints number of data in each group prior to balancing.
-                self.print_disagreements_by_group(new_set, all_inds, disagree, agree)
-
-                # Performs class balancing on the disagreements. Note that the
-                # disagreements and agreements are balanced separately.
-                disagree = self.rebalance_classes(disagree, disagree_targets)
-                agree = self.rebalance_classes(agree, agree_targets)
-                """
-                pass
-             
             # Adds disagreement and agreement points to indices.
             indices = np.concatenate((disagree, agree))
 

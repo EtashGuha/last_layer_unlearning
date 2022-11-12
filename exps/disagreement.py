@@ -17,7 +17,7 @@ from groundzero.models.resnet import ResNet
 def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dropout=0, rebalancing=True, class_weights=[1., 1.], dfr_epochs=100, disagreement_ablation=False):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
-    disagreement_args.balanced_sampler = True if rebalancing else False
+    disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
     model = load_model(disagreement_args, ResNet)
 
     finetune_args = deepcopy(args)
@@ -26,7 +26,6 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
     finetune_args.ckpt_every_n_epochs = dfr_epochs
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
-    #finetune_args.balanced_sampler = True if rebalancing else False
     if args.finetune_weights:
         finetune_args.weights = args.finetune_weights
 
@@ -40,7 +39,6 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
                     dropout_dfr=(dropout > 0),
-                    rebalancing=rebalancing,
                     disagreement_ablation=disagreement_ablation,
                 )
 
@@ -55,7 +53,6 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
                     dropout_dfr=(dropout > 0),
-                    rebalancing=rebalancing,
                     disagreement_ablation=disagreement_ablation,
                 )
 
@@ -101,8 +98,10 @@ def experiment(args):
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
-    GAMMAS = [0, 0.5, 1, 2, 4]
-    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    #GAMMAS = [0, 0.5, 1, 2, 4]
+    GAMMAS = [0.5, 2, 4]
+    #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    DROPOUTS = [0.1, 0.5, 0.9]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
@@ -163,9 +162,9 @@ def experiment(args):
     args.weights = max(list_of_weights, key=os.path.getctime)
 
     # for testing
-    #val_metrics, test_metrics = disagreement(args, gamma=2, dropout=0.5)
-    #print(test_metrics)
-    #return
+    val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=[1., 1.])
+    print(test_metrics)
+    return
 
     # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0

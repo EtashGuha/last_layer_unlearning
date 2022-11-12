@@ -154,7 +154,7 @@ class Subset(Dataset):
             self.test_indices = np.in1d(indices, self.test_indices).nonzero()[0]
         if self.groups is not None:
             self.groups = [
-                np.in1d(group, indices).nonzero()[0]
+                np.in1d(indices, group).nonzero()[0]
                 for group in dataset.groups
             ]
 
