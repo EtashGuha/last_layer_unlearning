@@ -9,7 +9,7 @@ import numpy as np
 
 # Imports PyTorch packages.
 from torch import Generator, randperm
-from torch.utils.data import DataLoader, Subset, WeightedRandomSampler
+from torch.utils.data import DataLoader, random_split, Subset, WeightedRandomSampler
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
 
@@ -125,7 +125,7 @@ class DataModule(VisionDataModule):
             else:
                 train_indices = randperm(
                     len(dataset_train),
-                    generator=torch.Generator().manual_seed(self.seed),
+                    generator=Generator().manual_seed(self.seed),
                 ).tolist()
                 train_length = self._get_splits(len(dataset_train))[0]
                 train_indices = train_indices[:train_length]
@@ -195,7 +195,7 @@ class DataModule(VisionDataModule):
             A torch.utils.data.Subset of the given dataset with the desired split.
         """
 
-        if train and dataset.train_indices and dataset.val_indices:
+        if train and hasattr(dataset, "train_indices") and hasattr(dataset, "val_indices"):
             # Calculates a preset split based on the given indices.
             dataset_train = Subset(dataset, dataset.train_indices)
             dataset_val = Subset(dataset, dataset.val_indices)
@@ -206,7 +206,7 @@ class DataModule(VisionDataModule):
             dataset_train, dataset_val = random_split(
                 dataset,
                 splits,
-                generator=torch.Generator().manual_seed(self.seed),
+                generator=Generator().manual_seed(self.seed),
             )
 
         if train:
@@ -237,7 +237,7 @@ class DataModule(VisionDataModule):
     def val_dataloader(self):
         """Returns DataLoader(s) for the val dataset."""
 
-        if len(self.dataset_val.groups):
+        if hasattr(self.dataset_val, "groups") and len(self.dataset_val.groups):
             # Returns a list of DataLoaders for each group/split.
             # TODO: Breaks if self.dataset_val is a Subset?
             dataloaders = []
@@ -260,7 +260,7 @@ class DataModule(VisionDataModule):
     def test_dataloader(self):
         """Returns DataLoader(s) for the test dataset."""
 
-        if len(self.dataset_test.groups):
+        if hasattr(self.dataset_test, "groups") and len(self.dataset_test.groups):
             # Returns a list of DataLoaders for each group/split.
             # TODO: Breaks if self.dataset_test is a Subset?
             dataloaders = []

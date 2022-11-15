@@ -16,7 +16,7 @@ import torch
 
 # Imports groundzero packages.
 from groundzero.args import parse_args
-from groundzero.utils import valid_models_and_datamodules
+from groundzero.imports import valid_models_and_datamodules
 
 # Prevents PIL from throwing invalid error on large image files.
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -86,7 +86,7 @@ def load_trainer(args, addtl_callbacks=None):
         checkpointer1 = ModelCheckpoint(
             filename="{epoch:02d}-{val_loss:.3f}-{val_acc1:.3f}",
             save_top_k=-1,
-            every_n_epochs=args.ckpt_every_n_epochs,
+            every_n_epochs=args.ckpt_every_n_epoch,
         )
 
         # Checkpoints model with respect to validation loss.
@@ -103,7 +103,7 @@ def load_trainer(args, addtl_callbacks=None):
         checkpointer1 = ModelCheckpoint(
             filename="{epoch:02d}-{train_loss:.3f}-{train_acc1:.3f}",
             save_top_k=-1,
-            every_n_epochs=args.ckpt_every_n_epochs,
+            every_n_epochs=args.ckpt_every_n_epoch,
         )
 
         checkpointer2 = ModelCheckpoint(

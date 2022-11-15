@@ -8,7 +8,7 @@ from distutils.util import strtobool
 from pytorch_lightning import Trainer
 
 # Imports groundzero packages.
-from groundzero.utils import valid_model_and_datamodule_names
+from groundzero.imports import valid_model_and_datamodule_names
 
 
 def parse_args():
@@ -30,10 +30,10 @@ def add_input_args(parser):
 
     model_names, datamodule_names = valid_model_and_datamodule_names()
 
-    parser.add("--balanced_sampler", type=lambda x: bool(strtobool(x)))
+    parser.add("--balanced_sampler", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--batch_size", type=int)
     parser.add("--bias", default=True, type=lambda x: bool(strtobool(x)))
-    parser.add("--ckpt_every_n_epochs", default=1, type=int)
+    parser.add("--ckpt_every_n_epoch", default=1, type=int)
     parser.add("--class_weights", default=[], nargs="*", type=float)
     parser.add("--cnn_batchnorm", default=True, type=lambda x: bool(strtobool(x)))
     parser.add("--cnn_initial_width", default=32, type=int)
@@ -46,8 +46,8 @@ def add_input_args(parser):
     parser.add("--dropout_prob", default=0, type=float)
     parser.add("--input_channels", default=3, type=int)
     parser.add("--label_noise", default=0, type=float)
-    parser.add("--loss", default="cross_entropy", choices=["cross_entropy", "mse"])
-    parser.add("--lr", type=float)
+    parser.add("--loss", choices=["cross_entropy", "mse"], default="cross_entropy")
+    parser.add("--lr", type=float) 
     parser.add("--lr_drop", default=0.1, type=float)
     parser.add("--lr_steps", default=[], nargs="*", type=int)
     parser.add("--mlp_activation", choices=["relu", "sigmoid"], default="relu")
@@ -60,12 +60,13 @@ def add_input_args(parser):
     parser.add("--nin_padding", default=1, type=int)
     parser.add("--nin_width", default=192, type=int)
     parser.add("--num_workers", default=4, type=int)
-    parser.add("--optimizer", choices=["adam", "adamw", "sgd"], default="adam")
+    parser.add("--optimizer", choices=["adam", "adamw", "sgd"], default="sgd")
     parser.add("--out_dir", default="out")
     parser.add("--refresh_rate", default=1, type=int)
+    parser.add("--resnet_small_input", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--resnet_l1_regularization", default=0, type=float)
     parser.add("--resnet_pretrained", default=True, type=lambda x: bool(strtobool(x)))
-    parser.add("--resnet_version", choices=[18, 34, 50, 101, 152], default=18, type=int)
+    parser.add("--resnet_version", choices=[18, 34, 50, 101, 152], default=50, type=int)
     parser.add("--resume_training", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--resume_weights", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--seed", default=1, type=int)

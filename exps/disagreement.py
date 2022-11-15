@@ -98,18 +98,16 @@ def experiment(args):
             [1.,2.], [1.,3.], [1.,10.], [1.,100.],
             [2.,1.], [3.,1.], [10.,1.], [100.,1.],
         ])
-    #GAMMAS = [0, 0.5, 1, 2, 4]
-    GAMMAS = [0.5, 2, 4]
-    #DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
-    DROPOUTS = [0.1, 0.5, 0.9]
+    GAMMAS = [0, 0.5, 1, 2, 4]
+    #GAMMAS = [0.5, 2, 4]
+    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    #DROPOUTS = [0.1, 0.5, 0.9]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
     args.num_classes = 2
-    args.check_val_every_n_epoch = int(args.max_epochs / 10)
-    args.ckpt_every_n_epochs = int(args.max_epochs / 10)
 
     # full epochs model
     if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
@@ -162,9 +160,9 @@ def experiment(args):
     args.weights = max(list_of_weights, key=os.path.getctime)
 
     # for testing
-    val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=[1., 1.])
-    print(test_metrics)
-    return
+    #val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=[1., 1.])
+    #print(test_metrics)
+    #return
 
     # load current hyperparam search cfg if needed
     full_set_best_worst_group_val = 0

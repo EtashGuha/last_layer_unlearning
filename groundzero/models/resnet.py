@@ -34,9 +34,10 @@ class ResNet(Model):
         else:
             self.model = resnets[args.resnet_version](weights=None)
 
-        # TODO: Figure out sizing issue? Supposed to replace conv1 when
-        # images are smaller than ImageNet 224 x 224 (e.g., CIFAR-10)?
-        # self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7)
+        # Reduces the kernel size and stride for smaller inputs, e.g., CIFAR-10
+        # images (32 x 32) instead of ImageNet images (224 x 224).
+        if args.resnet_small_input:
+            self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
         self.model.fc = nn.Sequential(
             nn.Dropout(p=args.dropout_prob, inplace=True),
