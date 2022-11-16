@@ -2,12 +2,11 @@ accelerator: gpu
 batch_size: 256
 check_val_every_n_epoch: 10
 ckpt_every_n_epoch: 10
-cnn_initial_width: 16
-cnn_num_layers: 3
+cnn_padding: 1
 datamodule: cifar10
 devices: 1
 lr: 0.05
-max_epochs: 30
+max_epochs: 50
 mlp_hidden_dim: 128
 mlp_num_layers: 2
 model: resnet

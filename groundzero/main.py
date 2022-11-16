@@ -124,7 +124,7 @@ def load_trainer(args, addtl_callbacks=None):
 
     return trainer
 
-def main(args, model_class, datamodule_class, callbacks=None, reset_fc=False):
+def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
     """Main method for training and validation.
 
     Args:
@@ -132,6 +132,7 @@ def main(args, model_class, datamodule_class, callbacks=None, reset_fc=False):
         model_class: A class which inherits from groundzero.models.Model.
         datamodule_class: A class which inherits from groundzero.datamodules.DataModule.
         callbacks: Any desired callbacks besides ModelCheckpoint and TQDMProgressBar.
+        model_hooks: Any desired functions to run on the model before training.
 
     Returns:
         The trained model with its validation and test metrics.
@@ -148,11 +149,9 @@ def main(args, model_class, datamodule_class, callbacks=None, reset_fc=False):
 
     model = load_model(args, model_class)
 
-    # TODO: remove reset fc, put somewhere else.
-    if reset_fc:
-        for layer in model.model.fc:
-            if hasattr(layer, 'reset_parameters'):
-                layer.reset_parameters()
+    if model_hooks:
+        for hook in model_hooks:
+            hook(model)
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
 

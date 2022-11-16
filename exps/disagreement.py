@@ -14,7 +14,22 @@ from groundzero.main import load_model, main
 from groundzero.models.resnet import ResNet
 
 
-def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dropout=0, rebalancing=True, class_weights=[1., 1.], dfr_epochs=100, disagreement_ablation=False):
+def reset_fc(model):
+    for layer in model.model.fc:
+        if hasattr(layer, "reset_parameters"):
+            layer.reset_parameters()
+
+def disagreement(
+    args,
+    gamma=1,
+    misclassification_dfr=False,
+    orig_dfr=False,
+    dropout=0,
+    rebalancing=True,
+    class_weights=[1., 1.],
+    dfr_epochs=100,
+    disagreement_ablation=False,
+):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
     disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
@@ -42,7 +57,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
                     disagreement_ablation=disagreement_ablation,
                 )
 
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, reset_fc=True)
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, model_hooks=[reset_fc])
     elif args.datamodule == "celeba":
         class CelebADisagreement2(CelebADisagreement):
             def __init__(self, args):
@@ -56,7 +71,7 @@ def disagreement(args, gamma=1, misclassification_dfr=False, orig_dfr=False, dro
                     disagreement_ablation=disagreement_ablation,
                 )
 
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, reset_fc=True)
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, model_hooks=[reset_fc])
 
     return val_metrics, test_metrics
 

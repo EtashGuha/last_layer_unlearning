@@ -2,6 +2,8 @@ accelerator: gpu
 batch_size: 256
 check_val_every_n_epoch: 10
 ckpt_every_n_epoch: 10
+cnn_initial_width: 64
+cnn_padding: 1
 datamodule: cifar10
 devices: 1
 dropout_prob: 0.5
