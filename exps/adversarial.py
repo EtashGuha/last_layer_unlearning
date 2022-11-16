@@ -5,11 +5,14 @@ from pytorch_lightning import Trainer
 import torch
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
+
 from groundzero.args import add_input_args
 from groundzero.datamodules.cifar10 import CIFAR10
 from groundzero.main import main
 from groundzero.models.cnn import CNN
 from groundzero.models.resnet import ResNet
+
 
 class PGDAttack():
     def __init__(self, args, model):
@@ -74,18 +77,31 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 90
-    args.lr_steps = [30, 60]
+    args.max_epochs = 100
+    args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        """
-        WIDTHS = [32]
+        #STEPS = [1, 5, 10, 20]
+        #WIDTHS = [16, 32, 64, 128]
+        STEPS = [1]
+        WIDTHS = [16]
 
-        for width in WIDTHS:
-            args.cnn_initial_width = width
-            main(args, AdversarialCNN, CIFAR10)
-        """
-        main(args, AdversarialCNN, CIFAR10)
+        accs = []
+        for step in STEPS:
+            step_acc = []
+            args.pgd_steps = step
+            for width in WIDTHS:
+                args.cnn_initial_width = width
+                _, test_metrics = main(args, AdversarialCNN, CIFAR10)
+                step_acc.append(test_metrics["test_acc1"])
+            accs.append(step_acc)
+
+        for step_acc, step in zip(accs, STEPS):
+            plt.plot(WIDTHS, step_acc, label=step)
+        plt.legend()
+        plt.xlabel("CNN initial width")
+        plt.ylabel("Adversarial accuracy")
+        plt.savefig("adv.png", bbox_inches="tight")
 
     elif args.model == "resnet":
         main(args, AdversarialResNet, CIFAR10)
