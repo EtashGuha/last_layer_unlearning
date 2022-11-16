@@ -77,14 +77,12 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 100
+    args.max_epochs = 10
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        #STEPS = [1, 5, 10, 20]
-        #WIDTHS = [16, 32, 64, 128]
-        STEPS = [1]
-        WIDTHS = [16]
+        STEPS = [1, 5, 10, 20]
+        WIDTHS = [16, 32, 64, 128]
 
         accs = []
         for step in STEPS:
@@ -92,8 +90,8 @@ def experiment(args):
             args.pgd_steps = step
             for width in WIDTHS:
                 args.cnn_initial_width = width
-                _, test_metrics = main(args, AdversarialCNN, CIFAR10)
-                step_acc.append(test_metrics["test_acc1"])
+                _, _, test_metrics = main(args, AdversarialCNN, CIFAR10)
+                step_acc.append(test_metrics[0]["test_acc1"])
             accs.append(step_acc)
 
         for step_acc, step in zip(accs, STEPS):
