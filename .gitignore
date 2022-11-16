@@ -4,11 +4,14 @@ condor_logs
 data
 dist
 *.egg-info
+*.jpeg
+*.jpg
 lightning_logs
 *.nfs*
 out
 *.pickle
 *.pkl
+*.png
 __pycache__
 *.sh
 *.tar*

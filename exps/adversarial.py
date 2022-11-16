@@ -77,7 +77,7 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 10
+    args.max_epochs = 100
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
