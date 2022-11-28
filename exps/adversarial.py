@@ -45,9 +45,9 @@ class AdversarialCNN(CNN):
         self.adversary = PGDAttack(args, self.model)
 
     def step(self, batch, idx):
-        input, targets = batch
+        inputs, targets = batch
 
-        adv = self.adversary.perturb(input, targets)
+        adv = self.adversary.perturb(inputs, targets)
         adv_outputs = self.model(adv)
 
         loss = F.cross_entropy(adv_outputs, targets)
@@ -63,9 +63,9 @@ class AdversarialResNet(ResNet):
         self.adversary = PGDAttack(args, self.model)
 
     def step(self, batch, idx):
-        input, targets = batch
+        inputs, targets = batch
 
-        adv = self.adversary.perturb(input, targets)
+        adv = self.adversary.perturb(inputs, targets)
         adv_outputs = self.model(adv)
 
         loss = F.cross_entropy(adv_outputs, targets)
@@ -81,9 +81,23 @@ def experiment(args):
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        STEPS = [1, 5, 10, 20]
-        WIDTHS = [16, 32, 64, 128]
+        STEPS = [0, 1, 5, 10, 20]
+        WIDTHS = [16, 32, 64, 128, 256]
 
+        # ERM baseline
+        accs = []
+        for width in WIDTHS:
+            args.cnn_initial_width = width
+            _, _, test_metrics = main(args, CNN, CIFAR10)
+            accs.append(test_metrics[0]["test_acc1"])
+        plt.plot(WIDTHS, accs)
+        plt.xlabel("CNN initial width")
+        plt.ylabel("Accuracy")
+        plt.xscale("log", base=2)
+        plt.savefig("erm.png", bbox_inches="tight")
+        plt.clf()
+
+        # Adversarial training
         accs = []
         for step in STEPS:
             step_acc = []
@@ -95,10 +109,16 @@ def experiment(args):
             accs.append(step_acc)
 
         for step_acc, step in zip(accs, STEPS):
-            plt.plot(WIDTHS, step_acc, label=step)
+            if step != 0:
+                label = f"{step} steps"
+            else:
+                label = "ERM"
+            plt.plot(WIDTHS, step_acc, label=label)
+
         plt.legend()
         plt.xlabel("CNN initial width")
         plt.ylabel("Adversarial accuracy")
+        plt.xscale("log", base=2)
         plt.savefig("adv.png", bbox_inches="tight")
 
     elif args.model == "resnet":
