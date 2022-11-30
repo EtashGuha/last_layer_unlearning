@@ -6,12 +6,14 @@ import torch
 import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from groundzero.args import add_input_args
 from groundzero.datamodules.cifar10 import CIFAR10
 from groundzero.main import main
 from groundzero.models.cnn import CNN
 from groundzero.models.resnet import ResNet
+from groundzero.utils import to_np
 
 
 class PGDAttack():
@@ -22,34 +24,56 @@ class PGDAttack():
         self.epsilon = args.epsilon
         self.pgd_steps = args.pgd_steps
 
-    def perturb(self, x_natural, y):
+    def perturb(self, x_natural, y, compute_fosc=False):
         with torch.inference_mode(False):
             y = torch.clone(y)
             x = x_natural.detach()
             x = x + torch.zeros_like(x).uniform_(-self.epsilon, self.epsilon)
+
             for i in range(self.pgd_steps):
                 x.requires_grad_()
                 with torch.enable_grad():
                     logits = self.model(x)
                     loss = F.cross_entropy(logits, y)
                     loss.requires_grad_()
+
                 grad = torch.autograd.grad(loss, [x])[0]
                 x = x.detach() + self.alpha * torch.sign(grad.detach())
                 x = torch.min(torch.max(x, x_natural - self.epsilon), x_natural + self.epsilon)
                 x = torch.clamp(x, 0, 1)
-        return x
+
+            fosc = None
+            if self.pgd_steps > 0 and compute_fosc:
+                x.requires_grad_()
+                with torch.enable_grad():
+                    logits = self.model(x)
+                    loss = F.cross_entropy(logits, y)
+                    loss.requires_grad_()
+                grad = torch.autograd.grad(loss, [x])[0]
+
+                fosc = self.epsilon * torch.linalg.vector_norm(grad.reshape([len(x), -1]), ord=1, dim=-1)
+                fosc = fosc - torch.bmm((x - x_natural).reshape([len(x), 1, -1]), grad.reshape([len(x), -1, 1])).squeeze()
+                fosc = fosc.mean()
+
+        return x, fosc
 
 class AdversarialCNN(CNN):
     def __init__(self, args):
         super().__init__(args)
         self.adversary = PGDAttack(args, self.model)
+        self.fosc = []
 
     def step(self, batch, idx):
         inputs, targets = batch
 
-        adv = self.adversary.perturb(inputs, targets)
-        adv_outputs = self.model(adv)
+        if self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
+            adv, fosc = self.adversary.perturb(inputs, targets, compute_fosc=True)
+            self.fosc.append(fosc)
+            print(fosc)
+        else:
+            adv, _ = self.adversary.perturb(inputs, targets)
 
+        adv_outputs = self.model(adv)
         loss = F.cross_entropy(adv_outputs, targets)
         probs = F.softmax(adv_outputs, dim=1).detach().cpu()
         targets = targets.cpu()
@@ -61,13 +85,18 @@ class AdversarialResNet(ResNet):
     def __init__(self, args):
         super().__init__(args)
         self.adversary = PGDAttack(args, self.model)
+        self.fosc = []
 
     def step(self, batch, idx):
         inputs, targets = batch
 
-        adv = self.adversary.perturb(inputs, targets)
-        adv_outputs = self.model(adv)
+        if self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
+            adv, fosc = self.adversary.perturb(inputs, targets, compute_fosc=True)
+            self.fosc.append(fosc)
+        else:
+            adv, _ = self.adversary.perturb(inputs, targets)
 
+        adv_outputs = self.model(adv)
         loss = F.cross_entropy(adv_outputs, targets)
         probs = F.softmax(adv_outputs, dim=1).detach().cpu()
         targets = targets.cpu()
@@ -81,9 +110,12 @@ def experiment(args):
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        STEPS = [0, 1, 5, 10, 20]
-        WIDTHS = [16, 32, 64, 128, 256]
+        #STEPS = [0, 1, 5, 10, 20]
+        #WIDTHS = [16, 32, 64, 128, 256]
+        STEPS = [5]
+        WIDTHS = [16]
 
+        """
         # ERM baseline
         accs = []
         for width in WIDTHS:
@@ -96,17 +128,22 @@ def experiment(args):
         plt.xscale("log", base=2)
         plt.savefig("erm.png", bbox_inches="tight")
         plt.clf()
+        """
 
         # Adversarial training
         accs = []
+        foscs = []
         for step in STEPS:
             step_acc = []
+            step_fosc = []
             args.pgd_steps = step
             for width in WIDTHS:
                 args.cnn_initial_width = width
-                _, _, test_metrics = main(args, AdversarialCNN, CIFAR10)
+                model, _, test_metrics = main(args, AdversarialCNN, CIFAR10)
                 step_acc.append(test_metrics[0]["test_acc1"])
+                step_fosc.append(to_np(model.fosc).mean())
             accs.append(step_acc)
+            foscs.append(step_fosc)
 
         for step_acc, step in zip(accs, STEPS):
             if step != 0:
@@ -120,6 +157,19 @@ def experiment(args):
         plt.ylabel("Adversarial accuracy")
         plt.xscale("log", base=2)
         plt.savefig("adv.png", bbox_inches="tight")
+        plt.clf()
+
+        for step_fosc, step in zip(foscs, STEPS):
+            if step != 0:
+                label = "f{step} steps"
+                plt.plot(WIDTHS, step_fosc, label=label)
+
+        plt.legend()
+        plt.xlabel("CNN initial width")
+        plt.ylabel("Last epoch FOSC")
+        plt.xscale("log", base=2)
+        plt.savefig("fosc.png", bbox_inches="tight")
+        plt.clf()
 
     elif args.model == "resnet":
         main(args, AdversarialResNet, CIFAR10)
