@@ -59,7 +59,7 @@ class PGDAttack():
                 grad = torch.autograd.grad(loss, [x])[0]
 
                 grad = to_np(grad).reshape(len(x), -1)
-                grad_norm = self.epsilon * LA.norm(grad, ord=1, axis=1).reshape(-1, 1)
+                grad_norm = LA.norm(grad, ord=1, axis=1).reshape(-1, 1)
                 diff = to_np(x - x_natural).reshape(len(x), -1)
                 fosc = np.copy(grad_norm)
                 for i in range(len(x)):
@@ -123,7 +123,7 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 10
+    args.max_epochs = 5
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
