@@ -7,6 +7,7 @@ import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy import linalg as LA
 
 from groundzero.args import add_input_args
 from groundzero.datamodules.cifar10 import CIFAR10
@@ -20,9 +21,14 @@ class PGDAttack():
     def __init__(self, args, model):
         self.model = model
 
-        self.alpha = args.alpha
-        self.epsilon = args.epsilon
-        self.pgd_steps = args.pgd_steps
+        try:
+            self.alpha = args.alpha
+            self.epsilon = args.epsilon
+            self.pgd_steps = args.pgd_steps
+        except:
+            self.alpha = args["alpha"]
+            self.epsilon = args["epsilon"]
+            self.pgd_steps = args["pgd_steps"]
 
     def perturb(self, x_natural, y, compute_fosc=False):
         with torch.inference_mode(False):
@@ -40,6 +46,7 @@ class PGDAttack():
                 grad = torch.autograd.grad(loss, [x])[0]
                 x = x.detach() + self.alpha * torch.sign(grad.detach())
                 x = torch.min(torch.max(x, x_natural - self.epsilon), x_natural + self.epsilon)
+                #print(torch.linalg.vector_norm((x-x_natural).reshape([len(x), -1]), dim=1, ord=np.inf))
                 x = torch.clamp(x, 0, 1)
 
             fosc = None
@@ -51,8 +58,12 @@ class PGDAttack():
                     loss.requires_grad_()
                 grad = torch.autograd.grad(loss, [x])[0]
 
-                fosc = self.epsilon * torch.linalg.vector_norm(grad.reshape([len(x), -1]), ord=1, dim=-1)
-                fosc = fosc - torch.bmm((x - x_natural).reshape([len(x), 1, -1]), grad.reshape([len(x), -1, 1])).squeeze()
+                grad = to_np(grad).reshape(len(x), -1)
+                grad_norm = self.epsilon * LA.norm(grad, ord=1, axis=1).reshape(-1, 1)
+                diff = to_np(x - x_natural).reshape(len(x), -1)
+                fosc = np.copy(grad_norm)
+                for i in range(len(x)):
+                    fosc[i] = - np.dot(grad[i], diff[i]) + self.epsilon * grad_norm[i]
                 fosc = fosc.mean()
 
         return x, fosc
@@ -66,12 +77,18 @@ class AdversarialCNN(CNN):
     def step(self, batch, idx):
         inputs, targets = batch
 
-        if self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
+        if not self.training:
+            args.pgd_steps = 20
+            self.adversary = PGDAttack(self.hparams, self.model)
+            adv, _ = self.adversary.perturb(inputs, targets)
+        elif self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
             adv, fosc = self.adversary.perturb(inputs, targets, compute_fosc=True)
             self.fosc.append(fosc)
             print(fosc)
-        else:
+        elif self.hparams["pgd_steps"]:
             adv, _ = self.adversary.perturb(inputs, targets)
+        else:
+            adv = inputs
 
         adv_outputs = self.model(adv)
         loss = F.cross_entropy(adv_outputs, targets)
@@ -106,7 +123,7 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 100
+    args.max_epochs = 10
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
