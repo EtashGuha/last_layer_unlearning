@@ -1,10 +1,11 @@
-from configargparse import Parser
 from copy import deepcopy
+from time import time
 
 from pytorch_lightning import Trainer
 import torch
 import torch.nn.functional as F
 
+from configargparse import Parser
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import linalg as LA
@@ -46,7 +47,6 @@ class PGDAttack():
                 grad = torch.autograd.grad(loss, [x])[0]
                 x = x.detach() + self.alpha * torch.sign(grad.detach())
                 x = torch.min(torch.max(x, x_natural - self.epsilon), x_natural + self.epsilon)
-                #print(torch.linalg.vector_norm((x-x_natural).reshape([len(x), -1]), dim=1, ord=np.inf))
                 x = torch.clamp(x, 0, 1)
 
             fosc = None
@@ -63,7 +63,7 @@ class PGDAttack():
                 diff = to_np(x - x_natural).reshape(len(x), -1)
                 fosc = np.copy(grad_norm)
                 for i in range(len(x)):
-                    fosc[i] = - np.dot(grad[i], diff[i]) + self.epsilon * grad_norm[i]
+                    fosc[i] = max(0., - np.dot(grad[i], diff[i]) + self.epsilon * grad_norm[i])
                 fosc = fosc.mean()
 
         return x, fosc
@@ -78,13 +78,12 @@ class AdversarialCNN(CNN):
         inputs, targets = batch
 
         if not self.training:
-            args.pgd_steps = 20
+            self.hparams["pgd_steps"] = 20
             self.adversary = PGDAttack(self.hparams, self.model)
             adv, _ = self.adversary.perturb(inputs, targets)
         elif self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
             adv, fosc = self.adversary.perturb(inputs, targets, compute_fosc=True)
             self.fosc.append(fosc)
-            print(fosc)
         elif self.hparams["pgd_steps"]:
             adv, _ = self.adversary.perturb(inputs, targets)
         else:
@@ -123,16 +122,13 @@ class AdversarialResNet(ResNet):
 
 def experiment(args):
     args.dropout_prob = 0
-    args.max_epochs = 5
+    args.max_epochs = 100
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        #STEPS = [0, 1, 5, 10, 20]
-        #WIDTHS = [16, 32, 64, 128, 256]
-        STEPS = [5]
-        WIDTHS = [16]
+        STEPS = [0, 5, 10, 20]
+        WIDTHS = [16, 32, 64, 128, 256]
 
-        """
         # ERM baseline
         accs = []
         for width in WIDTHS:
@@ -145,22 +141,28 @@ def experiment(args):
         plt.xscale("log", base=2)
         plt.savefig("erm.png", bbox_inches="tight")
         plt.clf()
-        """
 
         # Adversarial training
         accs = []
         foscs = []
+        times = []
         for step in STEPS:
             step_acc = []
             step_fosc = []
+            step_times = []
             args.pgd_steps = step
             for width in WIDTHS:
                 args.cnn_initial_width = width
+                start = time()
                 model, _, test_metrics = main(args, AdversarialCNN, CIFAR10)
+                end = time()
                 step_acc.append(test_metrics[0]["test_acc1"])
-                step_fosc.append(to_np(model.fosc).mean())
+                if step != 0:
+                    step_fosc.append(to_np(model.fosc).mean())
+                step_times.append(end-start)
             accs.append(step_acc)
             foscs.append(step_fosc)
+            times.append(step_times)
 
         for step_acc, step in zip(accs, STEPS):
             if step != 0:
@@ -176,16 +178,28 @@ def experiment(args):
         plt.savefig("adv.png", bbox_inches="tight")
         plt.clf()
 
-        for step_fosc, step in zip(foscs, STEPS):
-            if step != 0:
-                label = "f{step} steps"
-                plt.plot(WIDTHS, step_fosc, label=label)
+        for step_fosc, step in zip(foscs[1:], STEPS[1:]):
+            label = "f{step} steps"
+            plt.plot(WIDTHS, step_fosc, label=label)
 
         plt.legend()
         plt.xlabel("CNN initial width")
         plt.ylabel("Last epoch FOSC")
         plt.xscale("log", base=2)
         plt.savefig("fosc.png", bbox_inches="tight")
+        plt.clf()
+
+        for step_time, step in zip(times, STEPS):
+            if step != 0:
+                label = f"{step} steps"
+            else:
+                label = "ERM"
+            plt.plot(WIDTHS, step_time, label=label)
+
+        plt.legend()
+        plt.xlabel("CNN initial width")
+        plt.ylabel("Wall-clock adversarial training time")
+        plt.savefig("time.png", bbox_inches="tight")
         plt.clf()
 
     elif args.model == "resnet":
