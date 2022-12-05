@@ -81,7 +81,8 @@ class AdversarialCNN(CNN):
             self.hparams["pgd_steps"] = 20
             self.adversary = PGDAttack(self.hparams, self.model)
             adv, _ = self.adversary.perturb(inputs, targets)
-        elif self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
+            self.hparams["pgd_steps"] = 0
+        elif self.hparams["pgd_steps"] and self.trainer.current_epoch == self.hparams["max_epochs"] - 1:
             adv, fosc = self.adversary.perturb(inputs, targets, compute_fosc=True)
             self.fosc.append(fosc)
         elif self.hparams["pgd_steps"]:
@@ -126,9 +127,12 @@ def experiment(args):
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        STEPS = [0, 5, 10, 20]
-        WIDTHS = [16, 32, 64, 128, 256]
+        #STEPS = [0, 5, 10, 20]
+        #WIDTHS = [16, 32, 64, 128, 256]
+        STEPS = [0]
+        WIDTHS = [128]
 
+        """
         # ERM baseline
         accs = []
         for width in WIDTHS:
@@ -141,6 +145,7 @@ def experiment(args):
         plt.xscale("log", base=2)
         plt.savefig("erm.png", bbox_inches="tight")
         plt.clf()
+        """
 
         # Adversarial training
         accs = []
@@ -163,7 +168,11 @@ def experiment(args):
             accs.append(step_acc)
             foscs.append(step_fosc)
             times.append(step_times)
+        print(accs)
+        print(foscs)
+        print(times)
 
+        """
         for step_acc, step in zip(accs, STEPS):
             if step != 0:
                 label = f"{step} steps"
@@ -201,6 +210,7 @@ def experiment(args):
         plt.ylabel("Wall-clock adversarial training time")
         plt.savefig("time.png", bbox_inches="tight")
         plt.clf()
+        """
 
     elif args.model == "resnet":
         main(args, AdversarialResNet, CIFAR10)
