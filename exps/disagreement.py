@@ -21,15 +21,57 @@ from groundzero.models.bert import BERT
 from groundzero.models.resnet import ResNet
 
 
+def get_latest_weights(version):
+    list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
+    return max(list_of_weights, key=os.path.getctime)
+
+def load_save_state(args):
+    # Instantiates save state.
+    if not osp.isfile("disagreement.pkl"):
+        with open("disagreement.pkl", "wb") as f:
+            pickle.dump({}, f)
+
+    # Loads save state.
+    with open("disagreement.pkl", "rb") as f:
+        save_state = pickle.load(f)
+        cfg = f"{args.seed}{args.datamodule}{args.disagreement_proportion}"
+        erm_cfg = f"{args.seed}{args.datamodule}"
+
+        resume = None
+        if cfg in save_state:
+            resume = save_state[cfg]
+        else:
+            save_state[cfg] = {}
+
+        erm_resume = None
+        if erm_cfg in save_state:
+            erm_resume = save_state[erm_cfg]
+        else:
+            save_state[erm_cfg] = {}
+    with open("disagreement.pkl", "wb") as f:
+        pickle.dump(save_state, f)
+        
+    return resume, erm_resume
+
 def reset_fc(model):
     for layer in model.model.fc:
         if hasattr(layer, "reset_parameters"):
             layer.reset_parameters()
 
-def save_metrics(cfg, metrics, name):
+def save_metrics(cfg, metrics, names):
+    # Must pass either 2 lists/tuples of the same length or 2 non-lists/non-tuples.
+    if (type(metrics) == list or type(metrics) == tuple
+        or type(names) == list or type(names) == tuple)):
+        assert type(metrics) == type(names)
+        assert len(metrics) == len(names)
+    else:
+        metrics = (metrics,)
+        names = (names,)
+
     with open("disagreement.pkl", "rb") as f:
         save_state = pickle.load(f)
-        save_state[cfg][name] = metrics
+        for metric, name in zip(metrics, names):
+            save_state[cfg][name] = metric
     with open("disagreement.pkl", "wb") as f:
         pickle.dump(save_state, f)
 
@@ -55,8 +97,6 @@ def disagreement(
     finetune_args.ckpt_every_n_epochs = dfr_epochs
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
-    if args.finetune_weights:
-        finetune_args.weights = args.finetune_weights
 
     if args.datamodule == "waterbirds":
         model = load_model(disagreement_args, ResNet)
@@ -113,102 +153,53 @@ def disagreement(
     return val_metrics, test_metrics
 
 def experiment(args):
-    # Instantiates save state.
-    if not osp.isfile("disagreement.pkl"):
-        with open("disagreement.pkl", "wb") as f:
-            pickle.dump({}, f)
+    # Loads save state from pickle file.
+    resume, erm_resume = load_save_state(args)
 
-    # Loads save state.
-    with open("disagreement.pkl", "rb") as f:
-        save_state = pickle.load(f)
-        cfg = f"{args.seed}{args.datamodule}{args.disagreement_proportion}{args.disagreement_from_early_stop_epochs}"
-        base_model_cfg = f"{args.seed}{args.datamodule}"
-
-        resume = None
-        if cfg in save_state:
-            resume = save_state[cfg]
-        else:
-            save_state[cfg] = {}
-
-        base_model_resume = None
-        if base_model_cfg in save_state:
-            base_model_resume = save_state[base_model_cfg]
-        else:
-            save_state[base_model_cfg] = {}
-    with open("disagreement.pkl", "wb") as f:
-        pickle.dump(save_state, f)
-
-    # Hyperparameter search specifications
-    PROPORTIONS = [0.005, 0.025, 0.05, 0.125, 0.25]
+    # Sets search parameters.
+    PROPORTIONS = [1, 5, 10, 25, 50]
     DROPOUTS = [0.5, 0.7, 0.9]
-
+    
+    # Sets datamodule-specific parameters.
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
+        args.num_classes = 2
         CLASS_WEIGHTS = [[1., 1.]]
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
+        args.num_classes = 2
         CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
     elif args.datamodule == "civilcomments":
         dm = CivilCommentsDisagreement
+        args.num_classes = 2
         CLASS_WEIGHTS = [[1., 1.]]
-    args.num_classes = 2
 
-    # full epochs model
-    if base_model_resume and "erm" in base_model_resume:
-        version = base_model_resume["erm"]["version"]
-        erm_metrics = base_model_resume["erm"]["metrics"]
-    else:
-        # resume if interrupted (need to manually add version)
-        if base_model_resume and "erm_version" in base_model_resume:
-            version = base_model_resume["erm"]["version"]
-            list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
-            args.weights = max(list_of_weights, key=os.path.getctime)
+    try:
+        # Loads ERM model.
+        erm_version = erm_resume["version"]
+        erm_metrics = erm_resume["metrics"]
+    except:
+        # Resumes ERM training if interrupted (need to manually add version).
+        if erm_resume:
+            erm_version = erm_resume["version"]
+            args.weights = get_latest_weights(erm_version)
             args.resume_training = True
         model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
         if not args.resume_training:
-            version = model.trainer.logger.version
+            erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         args.weights = ""
         args.resume_training = ""
         del model
 
-        with open("disagreement.pkl", "rb") as f:
-            save_state = pickle.load(f)
-        save_state[base_model_cfg]["erm"]["version"] = version
-        save_state[base_model_cfg]["erm"]["metrics"] = erm_metrics
-        with open("disagreement.pkl", "wb") as f:
-            pickle.dump(save_state, f)
+        save_metrics(erm_cfg, (erm_version, erm_metrics), ("version", "metrics"))
  
-    args.finetune_weights = None
-    """
-    # e.g., disagree from 10 epochs but finetune from 100
-    if args.disagreement_from_early_stop_epochs:
-        # TODO: CHANGE THIS.
-        args.finetune_weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
-        args.max_epochs = args.disagreement_from_early_stop_epochs
-        args.check_val_every_n_epoch = args.max_epochs
-
-        if resume and "early_version" in resume:
-            version = resume["early_version"]
-        else:
-            model, _, _ = main(args, ResNet, dm)
-            version = model.trainer.logger.version
-            del model
-
-            with open("disagreement.pkl", "rb") as f:
-                save_state = pickle.load(f)
-            save_state[cfg]["early_version"] = version
-            with open("disagreement.pkl", "wb") as f:
-                pickle.dump(save_state, f)
-    """
-
-    list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
-    args.weights = max(list_of_weights, key=os.path.getctime)
+    args.weights = get_latest_weights(erm_version)
 
     # Loads current hyperparam search cfg if needed.
     orig = {val: 0}
     miscls = {val: 0}
-    dropout = {1: {val: 0}, 5: {val: 0}, 10: {val: 0}, 25: {val: 0}, 50: {val: 0}}
+    dropout = {p: {val: 0} for p in PROPORTIONS}
     start_idx = 0
     if resume:
         if "orig" in resume:
@@ -249,10 +240,10 @@ def experiment(args):
 
             save_metrics(cfg, miscls, "miscls")
 
-        for proportion, p in zip(PROPORTIONS, (1, 5, 10, 25, 50)):
+        for proportion in PROPORTIONS:
             for dropout in DROPOUTS:
-                print(f"Dropout DFR: Class Weights {class_weights} Proportion {proportion} Dropout {dropout}")
-                val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion, dropout=dropout, class_weights=class_weights)
+                print(f"Dropout DFR Proportion {p}: Class Weights {class_weights} Dropout {dropout}")
+                val_metrics, test_metrics = disagreement(args, kldiv_proportion=p/200, dropout=dropout, class_weights=class_weights)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                 if best_wg_val > dropout_val:
@@ -277,15 +268,17 @@ def experiment(args):
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
     print(erm_metrics)
-    print("\nFull Set DFR:")
-    print(full_set_params)
-    print(full_set_metrics)
+    print("\nOriginal DFR:")
+    print(orig["params"])
+    print(orig["metrics"])
     print("\nMisclassification DFR:")
-    print(misclassification_params)
-    print(misclassification_metrics)
-    print("\nDropout DFR:")
-    print(dropout_params)
-    print(dropout_metrics)
+    print(miscls["params"])
+    print(miscls["metrics"])
+    for p in PROPORTIONS:
+        print("\nDropout DFR Proportion {p}:")
+        print(dropout[p]["params"])
+        print(dropout[p]["metrics"])
+    
     """
     print("\nRebalancing Ablation w/ Best Dropout Config")
     print(rebalancing_ablation_metrics)
