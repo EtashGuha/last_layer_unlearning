@@ -26,19 +26,10 @@ def reset_fc(model):
         if hasattr(layer, "reset_parameters"):
             layer.reset_parameters()
 
-def save_metrics(cfg, val, params, metrics, name):
+def save_metrics(cfg, metrics, name):
     with open("disagreement.pkl", "rb") as f:
         save_state = pickle.load(f)
-        save_state[cfg][f"{name}_best_worst_group_val"] = val
-        save_state[cfg][f"{name}_set_params"] = params
-        save_state[cfg][f"{name}_set_metrics"] = metrics
-    with open("disagreement.pkl", "wb") as f:
-        pickle.dump(save_state, f)
-
-def save_idx(cfg, j):
-    with open("disagreement.pkl", "rb") as f:
-        save_state = pickle.load(f)
-    save_state[cfg]["start_class_weight_idx"] = j
+        save_state[cfg][name] = metrics
     with open("disagreement.pkl", "wb") as f:
         pickle.dump(save_state, f)
 
@@ -148,27 +139,28 @@ def experiment(args):
         pickle.dump(save_state, f)
 
     # Hyperparameter search specifications
-    #CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
-    CLASS_WEIGHTS = [[1., 1.]]
     PROPORTIONS = [0.005, 0.025, 0.05, 0.125, 0.25]
-    DROPOUTS = [0.1, 0.3, 0.5, 0.7, 0.9]
+    DROPOUTS = [0.5, 0.7, 0.9]
 
     if args.datamodule == "waterbirds":
         dm = WaterbirdsDisagreement
+        CLASS_WEIGHTS = [[1., 1.]]
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
+        CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
     elif args.datamodule == "civilcomments":
         dm = CivilCommentsDisagreement
+        CLASS_WEIGHTS = [[1., 1.]]
     args.num_classes = 2
 
     # full epochs model
-    if base_model_resume and "erm_version" in base_model_resume and "erm_metrics" in base_model_resume:
-        version = base_model_resume["erm_version"]
-        erm_metrics = base_model_resume["erm_metrics"]
+    if base_model_resume and "erm" in base_model_resume:
+        version = base_model_resume["erm"]["version"]
+        erm_metrics = base_model_resume["erm"]["metrics"]
     else:
         # resume if interrupted (need to manually add version)
         if base_model_resume and "erm_version" in base_model_resume:
-            version = base_model_resume["erm_version"]
+            version = base_model_resume["erm"]["version"]
             list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
             args.weights = max(list_of_weights, key=os.path.getctime)
             args.resume_training = True
@@ -182,13 +174,14 @@ def experiment(args):
 
         with open("disagreement.pkl", "rb") as f:
             save_state = pickle.load(f)
-        save_state[base_model_cfg]["erm_version"] = version
-        save_state[base_model_cfg]["erm_metrics"] = erm_metrics
+        save_state[base_model_cfg]["erm"]["version"] = version
+        save_state[base_model_cfg]["erm"]["metrics"] = erm_metrics
         with open("disagreement.pkl", "wb") as f:
             pickle.dump(save_state, f)
  
-    # e.g., disagree from 10 epochs but finetune from 100
     args.finetune_weights = None
+    """
+    # e.g., disagree from 10 epochs but finetune from 100
     if args.disagreement_from_early_stop_epochs:
         # TODO: CHANGE THIS.
         args.finetune_weights = osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/last.ckpt")
@@ -207,78 +200,71 @@ def experiment(args):
             save_state[cfg]["early_version"] = version
             with open("disagreement.pkl", "wb") as f:
                 pickle.dump(save_state, f)
+    """
 
     list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
     args.weights = max(list_of_weights, key=os.path.getctime)
 
-    # for testing
-    #val_metrics, test_metrics = disagreement(args, gamma=1, dropout=0.3, class_weights=[1., 1.])
-    #print(test_metrics)
-    #return
-
     # Loads current hyperparam search cfg if needed.
-    orig_val = 0
-    miscls_val = 0
-    dropout_val = 0
-    start_class_weight_idx = 0
-    if resume and "orig_val" in resume and "orig_params" in resume and "orig_metrics" in resume:
-        orig_val = resume["orig_val"]
-        orig_params = resume["orig_params"]
-        orig_metrics = resume["orig_metrics"]
-    if resume and "miscls_val" in resume and "miscls_params" in resume and "miscls_metrics" in resume:
-        miscls_val = resume["miscls_val"]
-        miscls_params = resume["miscls_params"]
-        miscls_metrics = resume["miscls_metrics"]
-    if resume and "dropout_val" in resume and "dropout_params" in resume and "dropout_metrics" in resume:
-        dropout_val = resume["dropout_val"]
-        dropout_params = resume["dropout_params"]
-        dropout_metrics = resume["dropout_metrics"]
-    if resume and "start_class_weight_idx" in resume:
-        start_class_weight_idx = resume["start_class_weight_idx"]
+    orig = {val: 0}
+    miscls = {val: 0}
+    dropout = {1: {val: 0}, 5: {val: 0}, 10: {val: 0}, 25: {val: 0}, 50: {val: 0}}
+    start_idx = 0
+    if resume:
+        if "orig" in resume:
+            orig = resume["orig"]
+        if "miscls" in resume:
+            miscls = resume["miscls"]
+        if "dropout" in resume:
+            dropout = resume["dropout"]
+        if "start_idx" in resume:
+            start_idx = resume["start_idx"]
 
     # Does hyperparameter search based on worst group validation error.
     for j, class_weights in enumerate(CLASS_WEIGHTS):
         # Skips to the right point if resuming.
-        if j < start_class_weight_idx:
+        if j < start_idx:
             continue
-        save_idx(cfg, j)
+        save_metrics(cfg, j, "start_idx")
 
         print(f"Full Set DFR: Class Weights {class_weights}")
         val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
         if best_wg_val > orig_val:
-            orig_val = best_wg_val
-            orig_params = [class_weights]
-            orig_metrics = [val_metrics, test_metrics]
+            orig["val"] = best_wg_val
+            orig["params"] = [class_weights]
+            orig["metrics"] = [val_metrics, test_metrics]
 
-            save_metrics(cfg, orig_val, orig_params, orig_metrics, "orig")
+            save_metrics(cfg, orig, "orig")
 
         print(f"Misclassification DFR: Class Weights {class_weights} Gamma 1")
         val_metrics, test_metrics = disagreement(args, gamma=1, misclassification_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
         if best_wg_val > miscls_val:
-            miscls_val = best_wg_val
-            miscls_params = [class_weights, 1]
-            miscls_metrics = [val_metrics, test_metrics]
+            miscls["val"] = best_wg_val
+            miscls["params"] = [class_weights]
+            miscls["metrics"] = [val_metrics, test_metrics]
 
-            save_metrics(cfg, miscls_val, miscls_params, miscls_metrics, "miscls")
+            save_metrics(cfg, miscls, "miscls")
 
-        for proportion in PROPORTIONS:
+        for proportion, p in zip(PROPORTIONS, (1, 5, 10, 25, 50)):
             for dropout in DROPOUTS:
                 print(f"Dropout DFR: Class Weights {class_weights} Proportion {proportion} Dropout {dropout}")
                 val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion, dropout=dropout, class_weights=class_weights)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                 if best_wg_val > dropout_val:
-                    dropout_val = best_wg_val
-                    dropout_params = [class_weights, proportion, dropout]
-                    dropout_metrics = [val_metrics, test_metrics]
+                    dropout[p]["val"] = best_wg_val
+                    dropout[p]["params"] = [class_weights, dropout]
+                    dropout[p]["metrics"] = [val_metrics, test_metrics]
 
-                    save_metrics(cfg, dropout_val, dropout_params, dropout_metrics, "dropout")
+                    save_metrics(cfg, dropout, "dropout")
 
-    save_idx(cfg, len(CLASS_WEIGHTS))
+    save_metrics(cfg, len(CLASS_WEIGHTS), "start_idx")
+
+    """
     class_weights, proportion, dropout = dropout_params
     print("Rebalancing Ablation")
     _, rebalancing_ablation_metrics = disagreement(args, kldiv_proportion=proportion, dropout=dropout, class_weights=class_weights, rebalancing=False)
@@ -286,6 +272,7 @@ def experiment(args):
     _, bottom_ablation_metrics = disagreement(args, kldiv_top_proportion=proportion, kldiv_bottom_proportion=0, dropout=dropout, class_weights=class_weights)
     print("KLDiv Top Ablation")
     _, top_ablation_metrics = disagreement(args, kldiv_top_proportion=0, kldiv_bottom_proportion=proportion, dropout=dropout, class_weights=class_weights)
+    """
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
@@ -299,12 +286,14 @@ def experiment(args):
     print("\nDropout DFR:")
     print(dropout_params)
     print(dropout_metrics)
+    """
     print("\nRebalancing Ablation w/ Best Dropout Config")
     print(rebalancing_ablation_metrics)
     print("\nKLDiv Bottom Ablation w/ Best Dropout Config")
     print(bottom_ablation_metrics)
     print("\nKLDiv Top Ablation w/ Best Dropout Config")
     print(top_ablation_metrics)
+    """
 
 if __name__ == "__main__":
     parser = Parser(
