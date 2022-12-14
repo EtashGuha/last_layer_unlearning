@@ -11,4 +11,4 @@ python -m pip install -e .
 ```
 
 ### Workflow
-Base code goes in `groundzero`. Experiment code goes in `exps`. Config files go in `cfgs`. When submitting a new experiment through Condor, rewrite the line in `run.sh` to match the experiment you want to run.
+Base code goes in `groundzero`. Experiment code goes in `exps`. Config files go in `cfgs`.
