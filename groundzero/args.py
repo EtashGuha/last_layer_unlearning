@@ -49,6 +49,7 @@ def add_input_args(parser):
     parser.add("--loss", choices=["cross_entropy", "mse"], default="cross_entropy")
     parser.add("--lr", type=float) 
     parser.add("--lr_drop", default=0.1, type=float)
+    parser.add("--lr_scheduler", choices=["cosine", "linear", "step"], default="step")
     parser.add("--lr_steps", default=[], nargs="*", type=int)
     parser.add("--mlp_activation", choices=["relu", "sigmoid"], default="relu")
     parser.add("--mlp_hidden_dim", default=256, type=int)

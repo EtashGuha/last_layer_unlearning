@@ -92,21 +92,24 @@ class Dataset(VisionDataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        img, target = self.data[index], self.targets[index]
+        datum, target = self.data[index], self.targets[index]
 
         # Loads a PIL.Image either from the cached np.ndarray data or from disk.
-        if isinstance(img, np.ndarray):
-            img = Image.fromarray(img)
-        elif isinstance(img, str):
-            img = Image.open(img)
+        try:
+            if isinstance(datum, np.ndarray):
+                datum = Image.fromarray(datum)
+            elif isinstance(datum, str):
+                datum = Image.open(datum)
+        except:
+            pass
 
         if self.transform is not None:
-            img = self.transform(img)
+            datum = self.transform(datum)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
+        return datum, target
 
     @abstractmethod
     def download(self):

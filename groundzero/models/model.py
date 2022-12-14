@@ -75,11 +75,25 @@ class Model(pl.LightningModule):
         if isinstance(optimizer, SGD):
             optimizer.momentum = self.hparams.momentum
 
-        scheduler = MultiStepLR(
-            optimizer,
-            self.hparams.lr_steps,
-            gamma=self.hparams.lr_drop,
-        )
+        scheduler = None
+        if self.hparams.lr_scheduler == "cosine":
+            scheduler = CosineAnnealingLR(
+                optimizer,
+                T_max=self.hparams.max_epochs,
+            )
+        elif self.hparams.lr_scheduler == "linear":
+            scheduler = LinearLR(
+                optimizer,
+                start_factor=1,
+                end_factor=self.hparams.lr_drop,
+                total_iters=self.hparams.max_epochs,
+            )
+        elif self.hparams.lr_scheduler == "step":
+            scheduler = MultiStepLR(
+                optimizer,
+                self.hparams.lr_steps,
+                gamma=self.hparams.lr_drop,
+            )
 
         return [optimizer], [scheduler]
     

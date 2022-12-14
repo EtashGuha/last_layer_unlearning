@@ -51,6 +51,9 @@ class Disagreement(DataModule):
         misclassification_dfr=False,
         dropout_dfr=False,
         disagreement_ablation=False,
+        kldiv_proportion=None,
+        kldiv_top_proportion=None,
+        kldiv_bottom_proportion=None
     ):
         """Initializes a Disagreement DataModule.
         
@@ -62,6 +65,7 @@ class Disagreement(DataModule):
             misclassification_dfr: Whether to perform misclassification DFR.
             dropout_dfr: Whether to perform dropout DFR.
             disagreement_ablation: Whether to only use agreement points.
+            kldiv_proportion: Proportion of samples to pick for KL Divergence (each).
         """
 
         super().__init__(args, *xargs)
@@ -74,6 +78,13 @@ class Disagreement(DataModule):
         self.misclassification_dfr = misclassification_dfr
         self.dropout_dfr = dropout_dfr
         self.disagreement_ablation = disagreement_ablation
+
+        self.kldiv_top_proportion = kldiv_proportion
+        self.kldiv_bottom_proportion = kldiv_bottom_proportion
+        if kldiv_top_proportion:
+            self.kldiv_top_proportion = kldiv_top_proportion
+        if kldiv_bottom_proportion:
+            self.kldiv_bottom_proportion = kldiv_bottom_proportion
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -257,25 +268,22 @@ class Disagreement(DataModule):
                         probs = F.softmax(logits, dim=1)
                         preds = torch.argmax(probs, dim=1)
 
-                        """
                         all_orig_logits.append(orig_logits)
                         all_logits.append(logits)
                         all_orig_probs.append(orig_probs)
                         all_probs.append(probs)
                         all_targets.extend(to_np(targets))
-                        """
 
                         # Gets dropout disagreements.
                         disagreements = to_np(torch.logical_xor(preds, orig_preds))
 
-                    #if self.misclassification_dfr:
-                    inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
-                    disagree.extend(inds[disagreements].tolist())
-                    disagree_targets.extend(targets[disagreements].tolist())
-                    agree.extend(inds[~disagreements].tolist())
-                    agree_targets.extend(targets[~disagreements].tolist())
+                    if self.misclassification_dfr:
+                        inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
+                        disagree.extend(inds[disagreements].tolist())
+                        disagree_targets.extend(targets[disagreements].tolist())
+                        agree.extend(inds[~disagreements].tolist())
+                        agree_targets.extend(targets[~disagreements].tolist())
             
-            """
             if not self.misclassification_dfr:
                 all_orig_logits = torch.cat(all_orig_logits)
                 all_logits = torch.cat(all_logits)
@@ -289,37 +297,35 @@ class Disagreement(DataModule):
                 del all_orig_probs
                 del all_probs
 
-                disagreements = to_np(torch.topk(kldiv, k=39)[1])
-                agreements = to_np(torch.topk(-kldiv, k=39)[1])
+                disagreements = to_np(torch.topk(kldiv, k=int(len(kldiv)*self.kldiv_top_proportion))[1])
+                agreements = to_np(torch.topk(-kldiv, k=int(len(kldiv)*self.kldiv_bottom_proportion))[1])
                 all_targets = np.asarray(all_targets)
 
                 disagree = all_inds[disagreements].tolist()
                 disagree_targets = all_targets[disagreements].tolist()
                 agree = all_inds[agreements].tolist()
                 agree_targets = all_targets[agreements].tolist()
-            """
-
-            if self.gamma > 0:
-                # Gets a gamma proportion of agreement points.
-                num_agree = int(self.gamma * len(disagree))
-                c = list(zip(agree, agree_targets))
-                random.shuffle(c)
-                agree, agree_targets = zip(*c)
-                agree = agree[:num_agree]
-                agree_targets = agree_targets[:num_agree]
-
-                if self.disagreement_ablation:
-                    # Ablates disagreement set (just uses agreement points).
-                    # Note that we still get a gamma proportion of
-                    # agreement points first, to fix the number of data.
-                    disagree = []
-                    disagree_targets = []
-            elif self.gamma == 0:
-                # Ablates agreement set (just uses disagreement points).
-                agree = []
-                agree_targets = []
             else:
-                raise ValueError("Gamma must be non-negative.")
+                if self.gamma > 0:
+                    # Gets a gamma proportion of agreement points.
+                    num_agree = int(self.gamma * len(disagree))
+                    c = list(zip(agree, agree_targets))
+                    random.shuffle(c)
+                    agree, agree_targets = zip(*c)
+                    agree = agree[:num_agree]
+                    agree_targets = agree_targets[:num_agree]
+                    if self.disagreement_ablation:
+                        # Ablates disagreement set (just uses agreement points).
+                        # Note that we still get a gamma proportion of
+                        # agreement points first, to fix the number of data.
+                        disagree = []
+                        disagree_targets = []
+                elif self.gamma == 0:
+                    # Ablates agreement set (just uses disagreement points).
+                    agree = []
+                    agree_targets = []
+                else:
+                    raise ValueError("Gamma must be non-negative.")
                 
             # Converts all lists to np.ndarrays.
             disagree = np.asarray(disagree, dtype=np.int64)

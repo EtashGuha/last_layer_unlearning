@@ -130,7 +130,7 @@ def experiment(args):
         #STEPS = [0, 5, 10, 20]
         #WIDTHS = [16, 32, 64, 128, 256]
         STEPS = [0]
-        WIDTHS = [128]
+        WIDTHS = [256]
 
         """
         # ERM baseline
