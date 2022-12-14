@@ -31,7 +31,6 @@ class Disagreement(DataModule):
 
     Attributes:
         model: The groundzero.models.Model used for disagreement.
-        disagreement_set: Either 'train' or 'val'; the dataset for disagreement.
         disagreement_proportion: The proportion of the dataset to use for disagreement.
         gamma: The proportion of agreements with which to augment disagreements.
         orig_dfr: Whether to use group labels to perform original DFR.
@@ -71,7 +70,6 @@ class Disagreement(DataModule):
         super().__init__(args, *xargs)
  
         self.model = model.cuda() if model else None
-        self.disagreement_set = args.disagreement_set
         self.disagreement_proportion = args.disagreement_proportion
         self.gamma = gamma
         self.orig_dfr = orig_dfr
@@ -91,8 +89,7 @@ class Disagreement(DataModule):
 
         msg = super().load_msg()
         msg = msg[:-1] + (
-            f", with disagreement set {self.disagreement_set}"
-            f" and proportion {self.disagreement_proportion}."
+            f", with proportion {self.disagreement_proportion}."
         )
         return msg
 
@@ -127,12 +124,8 @@ class Disagreement(DataModule):
                 dataset_reg = Subset(dataset, inds[disagreement_num:])
                 dataset_disagreement = Subset(dataset, inds[:disagreement_num])
 
-                if self.disagreement_set == "train":
-                    dataset_reg.train_indices = inds[disagreement_num:]
-                    dataset_disagreement.train_indices = inds[:disagreement_num]
-                elif self.disagreement_set == "val":
-                    dataset_reg.val_indices = inds[disagreement_num:]
-                    dataset_disagreement.val_indices = inds[:disagreement_num]
+                dataset_reg.val_indices = inds[disagreement_num:]
+                dataset_disagreement.val_indices = inds[:disagreement_num]
 
                 return dataset_reg, dataset_disagreement
             else:
@@ -199,10 +192,10 @@ class Disagreement(DataModule):
     def disagreement(self):
         """Computes disagreement set and saves it as self.dataset_train.
         
-        self.dataset_disagreement is initially the specified self.disagreement_proportion
-        of self.disagreement_set. Here, we perform some computation (i.e., the
-        actual disagreement) on self.dataset_disagreement to get the indices for
-        DFR. Then, we set these indices as self.dataset_train for DFR training.
+        self.dataset_disagreement is initially  the self.disagreement_proportion
+        of the held-out set. Here, we perform some computation (i.e., the actual
+        disagreement) on self.dataset_disagreement to get indices for DFR. Then,
+        we set these indices as self.dataset_train for DFR training.
         """
 
         dataloader = self.disagreement_dataloader()
@@ -219,11 +212,7 @@ class Disagreement(DataModule):
         agree = []
         agree_targets = []
 
-        # Gets all the relevant indices from the disagreement set.
-        if self.disagreement_set == "train":
-            all_inds = dataloader.dataset.train_indices
-        elif self.disagreement_set == "val":
-            all_inds = dataloader.dataset.val_indices
+        all_inds = dataloader.dataset.val_indices
 
         if self.orig_dfr:
             # Gets all indices and targets from the disagreement set.
@@ -337,8 +326,7 @@ class Disagreement(DataModule):
             indices = np.concatenate((disagree, agree))
 
         # Uses disagreement set as new training set for DFR.
-        if self.disagreement_set == "val":
-            new_set.train_indices = new_set.val_indices
+        new_set.train_indices = new_set.val_indices
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.
@@ -370,18 +358,11 @@ class Disagreement(DataModule):
             # Creates disagreement sets in addition to regular train/val split.
             dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
             self.dataset_train = self._split_dataset(dataset_train)
-            if self.disagreement_set == "train":
-                _, self.dataset_disagreement = self._split_dataset(
-                    dataset_val,
-                    disagreement_proportion=self.disagreement_proportion,
-                )
-                self.dataset_val = self._split_dataset(dataset_val, train=False)
-            elif self.disagreement_set == "val":
-                self.dataset_val, self.dataset_disagreement = self._split_dataset(
-                    dataset_val,
-                    disagreement_proportion=self.disagreement_proportion,
-                    train=False,
-                )
+            self.dataset_val, self.dataset_disagreement = self._split_dataset(
+                dataset_val,
+                disagreement_proportion=self.disagreement_proportion,
+                train=False,
+            )
 
             # Performs disagreement and sets new train dataset.
             if self.model:

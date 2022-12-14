@@ -1,11 +1,12 @@
 accelerator: gpu
 batch_size: 32
-check_val_every_n_epoch: 10
-ckpt_every_n_epoch: 10
+check_val_every_n_epoch: 25
+ckpt_every_n_epoch: 25
 data_augmentation: True
 datamodule: waterbirds
 devices: 1
-lr: 1e-3
+lr: 3e-3
+lr_scheduler: cosine
 max_epochs: 100
 model: resnet
 refresh_rate: 150

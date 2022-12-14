@@ -9,7 +9,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.optim import Adam, AdamW, SGD
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, MultiStepLR
 import torchvision.models as models
 
 # Imports groundzero packages.

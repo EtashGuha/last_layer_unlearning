@@ -59,9 +59,9 @@ def reset_fc(model):
             layer.reset_parameters()
 
 def save_metrics(cfg, metrics, names):
-    # Must pass either 2 lists/tuples of the same length or 2 non-lists/non-tuples.
+    # Must pass either 2 lists/tuples of the same length or 2 singletons..
     if (type(metrics) == list or type(metrics) == tuple
-        or type(names) == list or type(names) == tuple)):
+        or type(names) == list or type(names) == tuple):
         assert type(metrics) == type(names)
         assert len(metrics) == len(names)
     else:
@@ -218,7 +218,7 @@ def experiment(args):
             continue
         save_metrics(cfg, j, "start_idx")
 
-        print(f"Full Set DFR: Class Weights {class_weights}")
+        print(f"Original DFR: Class Weights {class_weights}")
         val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
@@ -229,7 +229,7 @@ def experiment(args):
 
             save_metrics(cfg, orig, "orig")
 
-        print(f"Misclassification DFR: Class Weights {class_weights} Gamma 1")
+        print(f"Misclassification DFR: Class Weights {class_weights}")
         val_metrics, test_metrics = disagreement(args, gamma=1, misclassification_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
@@ -297,7 +297,7 @@ if __name__ == "__main__":
     parser = add_input_args(parser)
     parser = Trainer.add_argparse_args(parser)
     parser.add("--disagreement_proportion", type=float)
-    parser.add("--disagreement_from_early_stop_epochs", default=0, type=int)
+    #parser.add("--disagreement_from_early_stop_epochs", default=0, type=int)
 
     args = parser.parse_args()
 
