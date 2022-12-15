@@ -297,6 +297,5 @@ class DataModule(VisionDataModule):
             num_workers=self.num_workers,
             drop_last=self.drop_last,
             pin_memory=self.pin_memory,
-            persistent_workers=True,
         )
 

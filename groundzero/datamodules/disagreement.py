@@ -50,6 +50,7 @@ class Disagreement(DataModule):
         orig_dfr=False,
         misclassification_dfr=False,
         dropout_dfr=False,
+        random_dfr=False,
         disagreement_ablation=False,
         kldiv_proportion=None,
         kldiv_top_proportion=None,
@@ -76,6 +77,7 @@ class Disagreement(DataModule):
         self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
         self.dropout_dfr = dropout_dfr
+        self.random_dfr = random_dfr
         self.disagreement_ablation = disagreement_ablation
 
         self.kldiv_top_proportion = kldiv_proportion
@@ -279,6 +281,7 @@ class Disagreement(DataModule):
                 all_logits = torch.cat(all_logits)
                 all_orig_probs = torch.cat(all_orig_probs)
                 all_probs = torch.cat(all_probs)
+                all_targets = np.asarray(all_targets)
                 kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
                 loss = F.cross_entropy(all_logits, all_orig_logits, reduction="none").squeeze()
 
@@ -287,14 +290,21 @@ class Disagreement(DataModule):
                 del all_orig_probs
                 del all_probs
 
-                disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
-                agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
-                all_targets = np.asarray(all_targets)
+                if self.dropout_dfr:
+                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
+                    agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
 
-                disagree = all_inds[disagreements].tolist()
-                disagree_targets = all_targets[disagreements].tolist()
-                agree = all_inds[agreements].tolist()
-                agree_targets = all_targets[agreements].tolist()
+                    disagree = all_inds[disagreements].tolist()
+                    disagree_targets = all_targets[disagreements].tolist()
+                    agree = all_inds[agreements].tolist()
+                    agree_targets = all_targets[agreements].tolist()
+                elif self.random_dfr:
+                    disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.kldiv_top_proportion*2)), replace=False)
+
+                    disagree = all_inds[disagreements].tolist()
+                    disagree_targets = all_targets[disagreements].tolist()
+                    agree = []
+                    agree_targets = []
             else:
                 if self.gamma > 0:
                     # Gets a gamma proportion of agreement points.

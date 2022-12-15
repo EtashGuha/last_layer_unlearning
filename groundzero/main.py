@@ -59,7 +59,7 @@ def load_model(args, model_class):
     if args.weights:
         if args.resume_training:
             # Resumes training state (weights, optimizer, epoch, etc.) from args.weights.
-            args.resume_from_checkpoint = args.weights
+            args.ckpt_path = args.weights
             print(f"Resuming training state from {args.weights}.")
         else:
             # Loads just the weights from args.weights.
@@ -155,7 +155,8 @@ def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
 
-    trainer.fit(model, datamodule=datamodule)
+    args.ckpt_path = args.ckpt_path if args.ckpt_path else None
+    trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
     val_metrics = trainer.validate(model, datamodule=datamodule, verbose=False)
     test_metrics = trainer.test(model, datamodule=datamodule)
     

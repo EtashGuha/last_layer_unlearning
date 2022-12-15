@@ -80,6 +80,7 @@ def disagreement(
     gamma=None,
     misclassification_dfr=False,
     orig_dfr=False,
+    random_dfr=False,
     dropout=0,
     rebalancing=True,
     class_weights=[1., 1.],
@@ -109,6 +110,7 @@ def disagreement(
                     gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
+                    random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
                     disagreement_ablation=disagreement_ablation,
                     kldiv_proportion=kldiv_proportion,
@@ -126,6 +128,7 @@ def disagreement(
                     gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
+                    random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
                     disagreement_ablation=disagreement_ablation,
                     kldiv_proportion=kldiv_proportion,
@@ -143,6 +146,7 @@ def disagreement(
                     gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
+                    random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
                     disagreement_ablation=disagreement_ablation,
                     kldiv_proportion=kldiv_proportion,
@@ -185,8 +189,7 @@ def experiment(args):
             args.weights = get_latest_weights(erm_version)
             args.resume_training = True
         model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
-        if not args.resume_training:
-            erm_version = model.trainer.logger.version
+        erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         args.weights = ""
         args.resume_training = ""
@@ -199,6 +202,7 @@ def experiment(args):
     # Loads current hyperparam search cfg if needed.
     orig = {"val": 0}
     miscls = {"val": 0}
+    random = {proportion: {"val": 0} for proportion in PROPORTIONS}
     dropout = {proportion: {"val": 0} for proportion in PROPORTIONS}
     start_idx = 0
     if resume:
@@ -206,6 +210,8 @@ def experiment(args):
             orig = resume["orig"]
         if "miscls" in resume:
             miscls = resume["miscls"]
+        if "random" in resume:
+            random = resume["random"]
         if "dropout" in resume:
             dropout = resume["dropout"]
         if "start_idx" in resume:
@@ -241,6 +247,17 @@ def experiment(args):
             save_metrics(cfg, miscls, "miscls")
 
         for proportion in PROPORTIONS:
+            print(f"Random DFR Proportion {proportion}: Class Weights {class_weights}")
+            val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion/200, class_weights=class_weights, random_dfr=True)
+
+            best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+            if best_wg_val > random[proportion]["val"]:
+                random[proportion]["val"] = best_wg_val
+                random[proportion]["params"] = [class_weights]
+                random[proportion]["metrics"] = [val_metrics, test_metrics]
+
+                save_metrics(cfg, random, "random")
+
             for drop in DROPOUTS:
                 print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} Dropout {drop}")
                 val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion/200, dropout=drop, class_weights=class_weights)
@@ -275,7 +292,10 @@ def experiment(args):
     print(miscls["params"])
     print(miscls["metrics"])
     for proportion in PROPORTIONS:
-        print("\nDropout DFR Proportion {p}:")
+        print(f"\nRandom DFR Proportion {proportion}:")
+        print(random[proportion]["params"])
+        print(random[proportion]["metrics"])
+        print(f"\nDropout DFR Proportion {proportion}:")
         print(dropout[proportion]["params"])
         print(dropout[proportion]["metrics"])
     
