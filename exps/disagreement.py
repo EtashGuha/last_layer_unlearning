@@ -51,7 +51,7 @@ def load_save_state(args):
     with open("disagreement.pkl", "wb") as f:
         pickle.dump(save_state, f)
         
-    return resume, erm_resume
+    return cfg, erm_cfg, resume, erm_resume
 
 def reset_fc(model):
     for layer in model.model.fc:
@@ -154,10 +154,10 @@ def disagreement(
 
 def experiment(args):
     # Loads save state from pickle file.
-    resume, erm_resume = load_save_state(args)
+    cfg, erm_cfg, resume, erm_resume = load_save_state(args)
 
     # Sets search parameters.
-    PROPORTIONS = [1, 5, 10, 25, 50]
+    PROPORTIONS = [2, 5, 10, 25, 50]
     DROPOUTS = [0.5, 0.7, 0.9]
     
     # Sets datamodule-specific parameters.
@@ -197,9 +197,9 @@ def experiment(args):
     args.weights = get_latest_weights(erm_version)
 
     # Loads current hyperparam search cfg if needed.
-    orig = {val: 0}
-    miscls = {val: 0}
-    dropout = {p: {val: 0} for p in PROPORTIONS}
+    orig = {"val": 0}
+    miscls = {"val": 0}
+    dropout = {proportion: {"val": 0} for proportion in PROPORTIONS}
     start_idx = 0
     if resume:
         if "orig" in resume:
@@ -222,7 +222,7 @@ def experiment(args):
         val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        if best_wg_val > orig_val:
+        if best_wg_val > orig["val"]:
             orig["val"] = best_wg_val
             orig["params"] = [class_weights]
             orig["metrics"] = [val_metrics, test_metrics]
@@ -233,7 +233,7 @@ def experiment(args):
         val_metrics, test_metrics = disagreement(args, gamma=1, misclassification_dfr=True, class_weights=class_weights)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        if best_wg_val > miscls_val:
+        if best_wg_val > miscls["val"]:
             miscls["val"] = best_wg_val
             miscls["params"] = [class_weights]
             miscls["metrics"] = [val_metrics, test_metrics]
@@ -241,15 +241,15 @@ def experiment(args):
             save_metrics(cfg, miscls, "miscls")
 
         for proportion in PROPORTIONS:
-            for dropout in DROPOUTS:
-                print(f"Dropout DFR Proportion {p}: Class Weights {class_weights} Dropout {dropout}")
-                val_metrics, test_metrics = disagreement(args, kldiv_proportion=p/200, dropout=dropout, class_weights=class_weights)
+            for drop in DROPOUTS:
+                print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} Dropout {drop}")
+                val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion/200, dropout=drop, class_weights=class_weights)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-                if best_wg_val > dropout_val:
-                    dropout[p]["val"] = best_wg_val
-                    dropout[p]["params"] = [class_weights, dropout]
-                    dropout[p]["metrics"] = [val_metrics, test_metrics]
+                if best_wg_val > dropout[proportion]["val"]:
+                    dropout[proportion]["val"] = best_wg_val
+                    dropout[proportion]["params"] = [class_weights, drop]
+                    dropout[proportion]["metrics"] = [val_metrics, test_metrics]
 
                     save_metrics(cfg, dropout, "dropout")
 
@@ -274,10 +274,10 @@ def experiment(args):
     print("\nMisclassification DFR:")
     print(miscls["params"])
     print(miscls["metrics"])
-    for p in PROPORTIONS:
+    for proportion in PROPORTIONS:
         print("\nDropout DFR Proportion {p}:")
-        print(dropout[p]["params"])
-        print(dropout[p]["metrics"])
+        print(dropout[proportion]["params"])
+        print(dropout[proportion]["metrics"])
     
     """
     print("\nRebalancing Ablation w/ Best Dropout Config")

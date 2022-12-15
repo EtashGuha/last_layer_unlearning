@@ -1,6 +1,7 @@
 """DataModule for disagreement-based datasets."""
 
 # Imports Python builtins.
+from math import ceil
 import random
 
 # Imports Python packages.
@@ -78,7 +79,7 @@ class Disagreement(DataModule):
         self.disagreement_ablation = disagreement_ablation
 
         self.kldiv_top_proportion = kldiv_proportion
-        self.kldiv_bottom_proportion = kldiv_bottom_proportion
+        self.kldiv_bottom_proportion = kldiv_proportion
         if kldiv_top_proportion:
             self.kldiv_top_proportion = kldiv_top_proportion
         if kldiv_bottom_proportion:
@@ -286,8 +287,8 @@ class Disagreement(DataModule):
                 del all_orig_probs
                 del all_probs
 
-                disagreements = to_np(torch.topk(kldiv, k=int(len(kldiv)*self.kldiv_top_proportion))[1])
-                agreements = to_np(torch.topk(-kldiv, k=int(len(kldiv)*self.kldiv_bottom_proportion))[1])
+                disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
+                agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
                 all_targets = np.asarray(all_targets)
 
                 disagree = all_inds[disagreements].tolist()

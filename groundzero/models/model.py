@@ -75,7 +75,6 @@ class Model(pl.LightningModule):
         if isinstance(optimizer, SGD):
             optimizer.momentum = self.hparams.momentum
 
-        scheduler = None
         if self.hparams.lr_scheduler == "cosine":
             scheduler = CosineAnnealingLR(
                 optimizer,
