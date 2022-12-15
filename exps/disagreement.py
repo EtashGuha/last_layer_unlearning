@@ -192,7 +192,7 @@ def experiment(args):
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         args.weights = ""
-        args.resume_training = ""
+        args.resume_training = False
         del model
 
         save_metrics(erm_cfg, (erm_version, erm_metrics), ("version", "metrics"))

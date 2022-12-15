@@ -155,8 +155,10 @@ def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
 
-    args.ckpt_path = args.ckpt_path if args.ckpt_path else None
+    args.ckpt_path = args.ckpt_path if hasattr(args, "ckpt_path") else None
     trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
+    args.ckpt_path = None
+
     val_metrics = trainer.validate(model, datamodule=datamodule, verbose=False)
     test_metrics = trainer.test(model, datamodule=datamodule)
     
