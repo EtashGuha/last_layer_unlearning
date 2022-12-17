@@ -292,22 +292,28 @@ class Disagreement(DataModule):
                     disagree_targets = []
                     agreements = []
                     agree_targets = []
-                    hi_num = int(ceil(len(kldiv)*self.kldiv_proportion))
-                    lo_num = int(ceil(len(kldiv)*self.kldiv_proportion))
+                    num = int(ceil(len(kldiv)*self.kldiv_proportion))
+
+                    # TODO: Change for >2 classes
+                    # Makes it so that if classes are imbalanced then we
+                    # oversample majority class.
+                    num_zeros = len([y for y in all_targets if y == 0])
+                    num_ones = len([y for y in all_targets if y == 1])
+                    if num_zeros < num:
+                        offset = num - num_zeros
+                    elif num_ones < num:
+                        offset = num - num_ones
+
                     for x in st_hi:
                         target = all_targets[x]
-                        if len([y for y in disagree_targets if y == target]) < hi_num // 2:
+                        if len([y for y in disagree_targets if y == target]) < num // 2 + offset // 2:
                             disagreements.append(x)
                             disagree_targets.append(target)
                     for x in st_lo:
                         target = all_targets[x]
-                        if len([y for y in agree_targets if y == target]) < lo_num // 2:
+                        if len([y for y in agree_targets if y == target]) < num // 2 + offset // 2:
                             agreements.append(x)
                             agree_targets.append(target)
-
-                    # TODO: If classes are imbalanced, may not have enough data
-                    # to actually balance them here! For example in the 50%
-                    # of data run on CelebA. Need to add an exception here.
 
                     disagree = all_inds[disagreements].tolist()
                     #disagree_targets = all_targets[disagreements].tolist()
@@ -317,12 +323,23 @@ class Disagreement(DataModule):
                     #disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.kldiv_top_proportion*2)), replace=False)
                     inds = np.arange(len(kldiv))
                     np.random.shuffle(inds)
-                    num = int(ceil(len(kldiv)*self.kldiv_proportion*2))
+                    num = int(ceil(len(kldiv)*self.kldiv_proportion))
                     disagreements = []
                     disagree_targets = []
+
+                    # TODO: Change for >2 classes
+                    # Makes it so that if classes are imbalanced then we
+                    # oversample majority class.
+                    num_zeros = len([y for y in all_targets if y == 0])
+                    num_ones = len([y for y in all_targets if y == 1])
+                    if num_zeros < num:
+                        offset = num - num_zeros
+                    elif num_ones < num:
+                        offset = num - num_ones
+
                     for x in inds:
                         target = all_targets[x]
-                        if len([y for y in disagree_targets if y == target]) < num // 2:
+                        if len([y for y in disagree_targets if y == target]) < num + offset:
                             disagreements.append(x)
                             disagree_targets.append(target)
 

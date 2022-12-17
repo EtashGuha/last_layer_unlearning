@@ -103,8 +103,7 @@ def disagreement(
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
-    #disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
-    disagreement_args.balanced_sampler = False # using all class labels to condition on classes beforehand
+    disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
 
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
