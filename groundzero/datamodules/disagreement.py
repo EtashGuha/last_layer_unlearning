@@ -306,12 +306,12 @@ class Disagreement(DataModule):
 
                     for x in st_hi:
                         target = all_targets[x]
-                        if len([y for y in disagree_targets if y == target]) < num // 2 + offset // 2:
+                        if len([y for y in disagree_targets if y == target]) < (num + offset) // 2:
                             disagreements.append(x)
                             disagree_targets.append(target)
                     for x in st_lo:
                         target = all_targets[x]
-                        if len([y for y in agree_targets if y == target]) < num // 2 + offset // 2:
+                        if len([y for y in agree_targets if y == target]) < (num + offset) // 2:
                             agreements.append(x)
                             agree_targets.append(target)
 
@@ -336,6 +336,9 @@ class Disagreement(DataModule):
                         offset = num - num_zeros
                     elif num_ones < num:
                         offset = num - num_ones
+
+                    if (num + offset) % 2 == 1:
+                        offset -= 1 # for fair comparison with dropout which is // 2 above
 
                     for x in inds:
                         target = all_targets[x]

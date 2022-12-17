@@ -332,7 +332,7 @@ if __name__ == "__main__":
 
     parser = add_input_args(parser)
     parser = Trainer.add_argparse_args(parser)
-    parser.add("--disagreement_proportion", type=float)
+    parser.add("--disagreement_proportion", type=float, default=0.5)
     #parser.add("--disagreement_from_early_stop_epochs", default=0, type=int)
 
     args = parser.parse_args()
