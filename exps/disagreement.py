@@ -188,7 +188,7 @@ def experiment(args):
         dm = CelebADisagreement
         args.num_classes = 2
         CLASS_WEIGHTS = [[1., 2.], [1., 3.], [1., 5.]]
-        TRAIN_DIST_PROPORTION = [0.4401, 0.4108, 0.1406, 0.0085]
+        TRAIN_DIST_PROPORTION = [0.4295, 0.4166, 0.1447, 0.0092]
     elif args.datamodule == "civilcomments":
         dm = CivilCommentsDisagreement
         args.num_classes = 2

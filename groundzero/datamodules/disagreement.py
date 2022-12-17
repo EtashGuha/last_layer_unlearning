@@ -305,6 +305,10 @@ class Disagreement(DataModule):
                             agreements.append(x)
                             agree_targets.append(target)
 
+                    # TODO: If classes are imbalanced, may not have enough data
+                    # to actually balance them here! For example in the 50%
+                    # of data run on CelebA. Need to add an exception here.
+
                     disagree = all_inds[disagreements].tolist()
                     #disagree_targets = all_targets[disagreements].tolist()
                     agree = all_inds[agreements].tolist()
