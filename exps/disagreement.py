@@ -75,6 +75,19 @@ def save_metrics(cfg, metrics, names):
     with open("disagreement.pkl", "wb") as f:
         pickle.dump(save_state, f)
 
+def print_metrics(test_metrics, train_dist_proportion):
+    train_dist_mean_acc = sum([p * group[f"test_acc1/dataloader_idx_{j+1}"] for j, (group, p) in enumerate(zip(test_metrics[1:], train_dist_proportion))])
+    test_dist_mean_acc = test_metrics[0]["test_acc1/dataloader_idx_0"]
+    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
+
+    train_dist_mean_acc = round(train_dist_mean_acc * 100, 1)
+    test_dist_mean_acc = round(test_dist_mean_acc * 100, 1)
+    worst_group_acc = round(worst_group_acc * 100, 1)
+
+    print(f"Train Dist Mean Acc: {train_dist_mean_acc}")
+    print(f"Test Dist Mean Acc: {test_dist_mean_acc}")
+    print(f"Worst Group Acc: {worst_group_acc}")
+
 def disagreement(
     args,
     gamma=None,
@@ -90,7 +103,8 @@ def disagreement(
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
-    disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
+    #disagreement_args.balanced_sampler = True if (rebalancing and not orig_dfr) else False #orig_dfr uses balancing by definition
+    disagreement_args.balanced_sampler = False # using all class labels to condition on classes beforehand
 
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
@@ -161,7 +175,7 @@ def experiment(args):
     cfg, erm_cfg, resume, erm_resume = load_save_state(args)
 
     # Sets search parameters.
-    PROPORTIONS = [2, 5, 10, 25, 50]
+    PROPORTIONS = [1, 2, 5, 10, 20, 50]
     DROPOUTS = [0.5, 0.7, 0.9]
     
     # Sets datamodule-specific parameters.
@@ -169,14 +183,17 @@ def experiment(args):
         dm = WaterbirdsDisagreement
         args.num_classes = 2
         CLASS_WEIGHTS = [[1., 1.]]
+        TRAIN_DIST_PROPORTION = [0.7295, 0.0384, 0.2204, 0.0117]
     elif args.datamodule == "celeba":
         dm = CelebADisagreement
         args.num_classes = 2
-        CLASS_WEIGHTS = [[1., 1.], [1., 2.], [1., 5.]]
+        CLASS_WEIGHTS = [[1., 2.], [1., 3.], [1., 5.]]
+        TRAIN_DIST_PROPORTION = [0.4401, 0.4108, 0.1406, 0.0085]
     elif args.datamodule == "civilcomments":
         dm = CivilCommentsDisagreement
         args.num_classes = 2
         CLASS_WEIGHTS = [[1., 1.]]
+        TRAIN_DIST_PROPORTION = []
 
     try:
         # Loads ERM model.
@@ -284,20 +301,20 @@ def experiment(args):
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
-    print(erm_metrics)
+    print_metrics(erm_metrics[1], TRAIN_DIST_PROPORTION)
     print("\nOriginal DFR:")
     print(orig["params"])
-    print(orig["metrics"])
+    print_metrics(orig["metrics"][1], TRAIN_DIST_PROPORTION)
     print("\nMisclassification DFR:")
     print(miscls["params"])
-    print(miscls["metrics"])
+    print_metrics(miscls["metrics"][1], TRAIN_DIST_PROPORTION)
     for proportion in PROPORTIONS:
         print(f"\nRandom DFR Proportion {proportion}:")
         print(random[proportion]["params"])
-        print(random[proportion]["metrics"])
+        print_metrics(random[proportion]["metrics"][1], TRAIN_DIST_PROPORTION)
         print(f"\nDropout DFR Proportion {proportion}:")
         print(dropout[proportion]["params"])
-        print(dropout[proportion]["metrics"])
+        print_metrics(dropout[proportion]["metrics"][1], TRAIN_DIST_PROPORTION)
     
     """
     print("\nRebalancing Ablation w/ Best Dropout Config")

@@ -53,8 +53,6 @@ class Disagreement(DataModule):
         random_dfr=False,
         disagreement_ablation=False,
         kldiv_proportion=None,
-        kldiv_top_proportion=None,
-        kldiv_bottom_proportion=None
     ):
         """Initializes a Disagreement DataModule.
         
@@ -80,12 +78,7 @@ class Disagreement(DataModule):
         self.random_dfr = random_dfr
         self.disagreement_ablation = disagreement_ablation
 
-        self.kldiv_top_proportion = kldiv_proportion
-        self.kldiv_bottom_proportion = kldiv_proportion
-        if kldiv_top_proportion:
-            self.kldiv_top_proportion = kldiv_top_proportion
-        if kldiv_bottom_proportion:
-            self.kldiv_bottom_proportion = kldiv_bottom_proportion
+        self.kldiv_proportion = kldiv_proportion
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -291,18 +284,46 @@ class Disagreement(DataModule):
                 del all_probs
 
                 if self.dropout_dfr:
-                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
-                    agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
+                    #disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
+                    #agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
+                    st_hi = to_np(torch.topk(kldiv, k=len(kldiv))[1])
+                    st_lo = to_np(torch.topk(-kldiv, k=len(kldiv))[1])
+                    disagreements = []
+                    disagree_targets = []
+                    agreements = []
+                    agree_targets = []
+                    hi_num = int(ceil(len(kldiv)*self.kldiv_proportion))
+                    lo_num = int(ceil(len(kldiv)*self.kldiv_proportion))
+                    for x in st_hi:
+                        target = all_targets[x]
+                        if len([y for y in disagree_targets if y == target]) < hi_num // 2:
+                            disagreements.append(x)
+                            disagree_targets.append(target)
+                    for x in st_lo:
+                        target = all_targets[x]
+                        if len([y for y in agree_targets if y == target]) < lo_num // 2:
+                            agreements.append(x)
+                            agree_targets.append(target)
 
                     disagree = all_inds[disagreements].tolist()
-                    disagree_targets = all_targets[disagreements].tolist()
+                    #disagree_targets = all_targets[disagreements].tolist()
                     agree = all_inds[agreements].tolist()
-                    agree_targets = all_targets[agreements].tolist()
+                    #agree_targets = all_targets[agreements].tolist()
                 elif self.random_dfr:
-                    disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.kldiv_top_proportion*2)), replace=False)
+                    #disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.kldiv_top_proportion*2)), replace=False)
+                    inds = np.arange(len(kldiv))
+                    np.random.shuffle(inds)
+                    num = int(ceil(len(kldiv)*self.kldiv_proportion*2))
+                    disagreements = []
+                    disagree_targets = []
+                    for x in inds:
+                        target = all_targets[x]
+                        if len([y for y in disagree_targets if y == target]) < num // 2:
+                            disagreements.append(x)
+                            disagree_targets.append(target)
 
                     disagree = all_inds[disagreements].tolist()
-                    disagree_targets = all_targets[disagreements].tolist()
+                    #disagree_targets = all_targets[disagreements].tolist()
                     agree = []
                     agree_targets = []
             else:

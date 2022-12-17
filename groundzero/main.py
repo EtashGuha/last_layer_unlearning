@@ -56,6 +56,7 @@ def load_model(args, model_class):
     model = model_class(args)
     print(model.load_msg())
  
+    args.ckpt_path = None
     if args.weights:
         if args.resume_training:
             # Resumes training state (weights, optimizer, epoch, etc.) from args.weights.
@@ -155,7 +156,6 @@ def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
 
-    args.ckpt_path = args.ckpt_path if hasattr(args, "ckpt_path") else None
     trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
     args.ckpt_path = None
 
