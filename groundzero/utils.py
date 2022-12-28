@@ -54,7 +54,9 @@ def to_np(x):
         ValueError: The input cannot be converted to a numpy array.
     """
 
-    if isinstance(x, torch.Tensor):
+    if not len(x):
+        return np.array([])
+    elif isinstance(x, torch.Tensor):
         return _to_np(x)
     elif isinstance(x, (np.ndarray, list)):
         if isinstance(x[0], torch.Tensor):

@@ -90,7 +90,6 @@ def print_metrics(test_metrics, train_dist_proportion):
 
 def disagreement(
     args,
-    gamma=None,
     misclassification_dfr=False,
     orig_dfr=False,
     random_dfr=False,
@@ -98,8 +97,8 @@ def disagreement(
     rebalancing=True,
     class_weights=[1., 1.],
     dfr_epochs=100,
-    disagreement_ablation=False,
-    kldiv_proportion=None,
+    proportion=None,
+    all_labels=False,
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dropout_prob = dropout
@@ -120,13 +119,12 @@ def disagreement(
                 super().__init__(
                     disagreement_args,
                     model=model,
-                    gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
                     random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
-                    disagreement_ablation=disagreement_ablation,
-                    kldiv_proportion=kldiv_proportion,
+                    proportion=proportion,
+                    all_labels=all_labels
                 )
 
         _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, model_hooks=[reset_fc])
@@ -138,13 +136,12 @@ def disagreement(
                 super().__init__(
                     disagreement_args,
                     model=model,
-                    gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
                     random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
-                    disagreement_ablation=disagreement_ablation,
-                    kldiv_proportion=kldiv_proportion,
+                    proportion=proportion,
+                    all_labels=all_labels
                 )
 
         _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, model_hooks=[reset_fc])
@@ -156,13 +153,12 @@ def disagreement(
                 super().__init__(
                     disagreement_args,
                     model=model,
-                    gamma=gamma,
                     orig_dfr=orig_dfr,
                     misclassification_dfr=misclassification_dfr,
                     random_dfr=random_dfr,
                     dropout_dfr=(dropout > 0),
-                    disagreement_ablation=disagreement_ablation,
-                    kldiv_proportion=kldiv_proportion,
+                    proportion=proportion,
+                    all_labels=all_labels,
                 )
 
         _, val_metrics, test_metrics = main(finetune_args, BERT, CivilCommentsDisagreement2, model_hooks=[reset_fc])
@@ -174,6 +170,7 @@ def experiment(args):
     cfg, erm_cfg, resume, erm_resume = load_save_state(args)
 
     # Sets search parameters.
+    ALL_LABELS = [False, True]
     PROPORTIONS = [1, 2, 5, 10, 20, 50]
     DROPOUTS = [0.5, 0.7, 0.9]
     
@@ -216,10 +213,11 @@ def experiment(args):
     args.weights = get_latest_weights(erm_version)
 
     # Loads current hyperparam search cfg if needed.
-    orig = {"val": 0}
-    miscls = {"val": 0}
-    random = {proportion: {"val": 0} for proportion in PROPORTIONS}
-    dropout = {proportion: {"val": 0} for proportion in PROPORTIONS}
+    orig = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    orig[100] = {"val": 0}
+    random = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    miscls = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    dropout = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
     start_idx = 0
     if resume:
         if "orig" in resume:
@@ -240,51 +238,63 @@ def experiment(args):
             continue
         save_metrics(cfg, j, "start_idx")
 
-        print(f"Original DFR: Class Weights {class_weights}")
-        val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights)
+        print(f"Original DFR Proportion 100: Class Weights {class_weights}")
+        val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights, proportion=100)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        if best_wg_val > orig["val"]:
-            orig["val"] = best_wg_val
-            orig["params"] = [class_weights]
-            orig["metrics"] = [val_metrics, test_metrics]
+        if best_wg_val > orig[100]["val"]:
+            orig[100]["val"] = best_wg_val
+            orig[100]["params"] = [class_weights]
+            orig[100]["metrics"] = [val_metrics, test_metrics]
 
             save_metrics(cfg, orig, "orig")
-
-        print(f"Misclassification DFR: Class Weights {class_weights}")
-        val_metrics, test_metrics = disagreement(args, gamma=1, misclassification_dfr=True, class_weights=class_weights)
-
-        best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        if best_wg_val > miscls["val"]:
-            miscls["val"] = best_wg_val
-            miscls["params"] = [class_weights]
-            miscls["metrics"] = [val_metrics, test_metrics]
-
-            save_metrics(cfg, miscls, "miscls")
-
-        for proportion in PROPORTIONS:
-            print(f"Random DFR Proportion {proportion}: Class Weights {class_weights}")
-            val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion/200, class_weights=class_weights, random_dfr=True)
-
-            best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-            if best_wg_val > random[proportion]["val"]:
-                random[proportion]["val"] = best_wg_val
-                random[proportion]["params"] = [class_weights]
-                random[proportion]["metrics"] = [val_metrics, test_metrics]
-
-                save_metrics(cfg, random, "random")
-
-            for drop in DROPOUTS:
-                print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} Dropout {drop}")
-                val_metrics, test_metrics = disagreement(args, kldiv_proportion=proportion/200, dropout=drop, class_weights=class_weights)
+        
+        for all_labels in ALL_LABELS:
+            for proportion in PROPORTIONS:
+                print(f"Original DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, orig_dfr=True, all_labels=all_labels)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-                if best_wg_val > dropout[proportion]["val"]:
-                    dropout[proportion]["val"] = best_wg_val
-                    dropout[proportion]["params"] = [class_weights, drop]
-                    dropout[proportion]["metrics"] = [val_metrics, test_metrics]
+                if best_wg_val > orig[proportion][all_labels]["val"]:
+                    orig[proportion][all_labels]["val"] = best_wg_val
+                    orig[proportion][all_labels]["params"] = [class_weights]
+                    orig[proportion][all_labels]["metrics"] = [val_metrics, test_metrics]
 
-                    save_metrics(cfg, dropout, "dropout")
+                    save_metrics(cfg, orig, "orig")
+
+                print(f"Random DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, random_dfr=True, all_labels=all_labels)
+
+                best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+                if best_wg_val > random[proportion][all_labels]["val"]:
+                    random[proportion][all_labels]["val"] = best_wg_val
+                    random[proportion][all_labels]["params"] = [class_weights]
+                    random[proportion][all_labels]["metrics"] = [val_metrics, test_metrics]
+
+                    save_metrics(cfg, random, "random")
+
+                print(f"Misclassification DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, misclassification_dfr=True, class_weights=class_weights, all_labels=all_labels)
+
+                best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+                if best_wg_val > miscls[proportion][all_labels]["val"]:
+                    miscls[proportion][all_labels]["val"] = best_wg_val
+                    miscls[proportion][all_labels]["params"] = [class_weights]
+                    miscls[proportion][all_labels]["metrics"] = [val_metrics, test_metrics]
+
+                    save_metrics(cfg, miscls, "miscls")
+
+                for drop in DROPOUTS:
+                    print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels} Dropout {drop}")
+                    val_metrics, test_metrics = disagreement(args, proportion=proportion/200, dropout=drop, class_weights=class_weights, all_labels=all_labels)
+
+                    best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+                    if best_wg_val > dropout[proportion][all_labels]["val"]:
+                        dropout[proportion][all_labels]["val"] = best_wg_val
+                        dropout[proportion][all_labels]["params"] = [class_weights, drop]
+                        dropout[proportion][all_labels]["metrics"] = [val_metrics, test_metrics]
+
+                        save_metrics(cfg, dropout, "dropout")
 
     save_metrics(cfg, len(CLASS_WEIGHTS), "start_idx")
 
@@ -301,19 +311,24 @@ def experiment(args):
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
     print_metrics(erm_metrics[1], TRAIN_DIST_PROPORTION)
-    print("\nOriginal DFR:")
-    print(orig["params"])
-    print_metrics(orig["metrics"][1], TRAIN_DIST_PROPORTION)
-    print("\nMisclassification DFR:")
-    print(miscls["params"])
-    print_metrics(miscls["metrics"][1], TRAIN_DIST_PROPORTION)
-    for proportion in PROPORTIONS:
-        print(f"\nRandom DFR Proportion {proportion}:")
-        print(random[proportion]["params"])
-        print_metrics(random[proportion]["metrics"][1], TRAIN_DIST_PROPORTION)
-        print(f"\nDropout DFR Proportion {proportion}:")
-        print(dropout[proportion]["params"])
-        print_metrics(dropout[proportion]["metrics"][1], TRAIN_DIST_PROPORTION)
+    print("\nOriginal DFR Proportion 100:")
+    print(orig[100]["params"])
+    print_metrics(orig[100]["metrics"][1], TRAIN_DIST_PROPORTION)
+
+    for label in ALL_LABELS:
+        for proportion in PROPORTIONS:
+            print(f"\nOriginal DFR Proportion {proportion} All Labels {label}:")
+            print(orig[proportion][label]["params"])
+            print_metrics(orig[proportion][label]["metrics"][1], TRAIN_DIST_PROPORTION)
+            print(f"\nRandom DFR Proportion {proportion} All Labels {label}:")
+            print(random[proportion][label]["params"])
+            print_metrics(random[proportion][label]["metrics"][1], TRAIN_DIST_PROPORTION)
+            print(f"\nMisclassification DFR Proportion {proportion} All Labels {label}:")
+            print(miscls[proportion][label]["params"])
+            print_metrics(miscls[proportion][label]["metrics"][1], TRAIN_DIST_PROPORTION)
+            print(f"\nDropout DFR Proportion {proportion} All Labels {label}:")
+            print(dropout[proportion][label]["params"])
+            print_metrics(dropout[proportion][label]["metrics"][1], TRAIN_DIST_PROPORTION)
     
     """
     print("\nRebalancing Ablation w/ Best Dropout Config")

@@ -46,13 +46,12 @@ class Disagreement(DataModule):
         args,
         *xargs,
         model=None,
-        gamma=1,
         orig_dfr=False,
         misclassification_dfr=False,
         dropout_dfr=False,
         random_dfr=False,
-        disagreement_ablation=False,
-        kldiv_proportion=None,
+        all_labels=False,
+        proportion=None,
     ):
         """Initializes a Disagreement DataModule.
         
@@ -64,21 +63,19 @@ class Disagreement(DataModule):
             misclassification_dfr: Whether to perform misclassification DFR.
             dropout_dfr: Whether to perform dropout DFR.
             disagreement_ablation: Whether to only use agreement points.
-            kldiv_proportion: Proportion of samples to pick for KL Divergence (each).
+            proportion: Proportion of samples to pick for disagreements/agreements.
         """
 
         super().__init__(args, *xargs)
  
         self.model = model.cuda() if model else None
         self.disagreement_proportion = args.disagreement_proportion
-        self.gamma = gamma
         self.orig_dfr = orig_dfr
         self.misclassification_dfr = misclassification_dfr
         self.dropout_dfr = dropout_dfr
         self.random_dfr = random_dfr
-        self.disagreement_ablation = disagreement_ablation
-
-        self.kldiv_proportion = kldiv_proportion
+        self.all_labels = all_labels
+        self.proportion = proportion
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -211,12 +208,53 @@ class Disagreement(DataModule):
         all_inds = dataloader.dataset.val_indices
 
         if self.orig_dfr:
-            # Gets all indices and targets from the disagreement set.
             targets = []
             for batch in dataloader:
                 targets.extend(to_np(batch[1]))
-            targets = np.asarray(targets)
-            indices = all_inds
+
+            if not self.all_labels:
+                if self.proportion == 100:
+                    targets = np.asarray(targets)
+                    indices = all_inds
+                else:
+                    inds = np.random.choice(np.arange(len(all_inds)), size=int(ceil(len(all_inds)*self.proportion*2)), replace=False)
+                    targets = np.asarray(targets)[inds]
+                    indices = all_inds[inds]
+            else:
+                all_inds_copy = np.arange(len(all_inds))
+                all_targets = np.asarray(targets)
+                np.random.shuffle(all_inds_copy)
+                num = int(ceil(len(all_inds)*self.proportion))
+
+                # TODO: Change for >2 classes
+                # Makes it so that if classes are imbalanced then we
+                # oversample majority class.
+                num_zeros = len([y for y in all_targets if y == 0])
+                num_ones = len([y for y in all_targets if y == 1])
+
+                offset = 0
+                if num_zeros < num:
+                    offset = num - num_zeros
+                elif num_ones < num:
+                    offset = num - num_ones
+
+                if (num + offset) % 2 == 1:
+                    num -= 1 # for fair comparison with dropout which is // 2 above
+
+                num_targets_seen = [0, 0]
+                inds = []
+                targets = []
+                for x in all_inds_copy:
+                    target = all_targets[x]
+
+                    if num_targets_seen[target] < num + offset:
+                        num_targets_seen[target] += 1
+                        inds.append(x)
+                        targets.append(target)
+
+                indices = all_inds[inds]
+                targets = np.asarray(targets)
+
         else:
             all_orig_logits = []
             all_logits = []
@@ -231,99 +269,144 @@ class Disagreement(DataModule):
                     inputs = inputs.cuda()
                     targets = targets.cuda()
 
-                    if self.misclassification_dfr:
-                        # Gets predictions from non-dropout model.
-                        self.model.eval()
-                        logits = self.model(inputs)
-                        probs = F.softmax(logits, dim=1)
-                        preds = torch.argmax(probs, dim=1)
+                    # Gets predictions from non-dropout model.
+                    self.model.eval()
+                    orig_logits = self.model(inputs)
+                    orig_probs = F.softmax(orig_logits, dim=1)
+                    orig_preds = torch.argmax(orig_probs, dim=1)
 
-                        # Gets misclassifications.
-                        disagreements = to_np(torch.logical_xor(preds, targets))
-                    else:
-                        # Gets predictions from non-dropout model.
-                        self.model.eval()
-                        orig_logits = self.model(inputs)
-                        orig_probs = F.softmax(orig_logits, dim=1)
-                        orig_preds = torch.argmax(orig_probs, dim=1)
+                    # Gets predictions from dropout model.
+                    self.model.train()
+                    logits = self.model(inputs)
+                    probs = F.softmax(logits, dim=1)
+                    preds = torch.argmax(probs, dim=1)
 
-                        # Gets predictions from dropout model.
-                        self.model.train()
-                        logits = self.model(inputs)
-                        probs = F.softmax(logits, dim=1)
-                        preds = torch.argmax(probs, dim=1)
+                    all_orig_logits.append(orig_logits)
+                    all_logits.append(logits)
+                    all_orig_probs.append(orig_probs)
+                    all_probs.append(probs)
+                    all_targets.append(targets)
 
-                        all_orig_logits.append(orig_logits)
-                        all_logits.append(logits)
-                        all_orig_probs.append(orig_probs)
-                        all_probs.append(probs)
-                        all_targets.extend(to_np(targets))
+            all_orig_logits = torch.cat(all_orig_logits)
+            all_logits = torch.cat(all_logits)
+            all_orig_probs = torch.cat(all_orig_probs)
+            all_probs = torch.cat(all_probs)
+            all_targets = torch.cat(all_targets)
+            kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
+            loss = F.cross_entropy(all_orig_logits, all_targets, reduction="none").squeeze()
 
-                        # Gets dropout disagreements.
-                        disagreements = to_np(torch.logical_xor(preds, orig_preds))
+            del all_orig_logits
+            del all_logits
+            del all_orig_probs
+            del all_probs
 
-                    if self.misclassification_dfr:
-                        inds = all_inds[(i * batch_size):min(((i+1) * batch_size), len(all_inds))]
-                        disagree.extend(inds[disagreements].tolist())
-                        disagree_targets.extend(targets[disagreements].tolist())
-                        agree.extend(inds[~disagreements].tolist())
-                        agree_targets.extend(targets[~disagreements].tolist())
-            
-            if not self.misclassification_dfr:
-                all_orig_logits = torch.cat(all_orig_logits)
-                all_logits = torch.cat(all_logits)
-                all_orig_probs = torch.cat(all_orig_probs)
-                all_probs = torch.cat(all_probs)
-                all_targets = np.asarray(all_targets)
-                kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
-                loss = F.cross_entropy(all_logits, all_orig_logits, reduction="none").squeeze()
-
-                del all_orig_logits
-                del all_logits
-                del all_orig_probs
-                del all_probs
-
-                if self.dropout_dfr:
-                    #disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.kldiv_top_proportion)))[1])
-                    #agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.kldiv_bottom_proportion)))[1])
+            if self.dropout_dfr:
+                if not self.all_labels:
+                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.proportion)))[1])
+                    agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.proportion)))[1])
+                    disagree = all_inds[disagreements].tolist()
+                    disagree_targets = all_targets[disagreements].tolist()
+                    agree = all_inds[agreements].tolist()
+                    agree_targets = all_targets[agreements].tolist()
+                else:
                     st_hi = to_np(torch.topk(kldiv, k=len(kldiv))[1])
                     st_lo = to_np(torch.topk(-kldiv, k=len(kldiv))[1])
                     disagreements = []
                     disagree_targets = []
                     agreements = []
                     agree_targets = []
-                    num = int(ceil(len(kldiv)*self.kldiv_proportion))
+                    num = int(ceil(len(kldiv)*self.proportion))
 
                     # TODO: Change for >2 classes
                     # Makes it so that if classes are imbalanced then we
                     # oversample majority class.
                     num_zeros = len([y for y in all_targets if y == 0])
                     num_ones = len([y for y in all_targets if y == 1])
+                    offset = 0
                     if num_zeros < num:
                         offset = num - num_zeros
                     elif num_ones < num:
                         offset = num - num_ones
 
+                    num_targets_seen = [0, 0]
                     for x in st_hi:
                         target = all_targets[x]
-                        if len([y for y in disagree_targets if y == target]) < (num + offset) // 2:
+
+                        if num_targets_seen[target] < (num + offset) // 2:
+                            num_targets_seen[target] += 1
                             disagreements.append(x)
                             disagree_targets.append(target)
+
+                    num_targets_seen = [0, 0]
                     for x in st_lo:
                         target = all_targets[x]
-                        if len([y for y in agree_targets if y == target]) < (num + offset) // 2:
+
+                        if num_targets_seen[target] < (num + offset) // 2:
+                            num_targets_seen[target] += 1
                             agreements.append(x)
                             agree_targets.append(target)
 
                     disagree = all_inds[disagreements].tolist()
-                    #disagree_targets = all_targets[disagreements].tolist()
                     agree = all_inds[agreements].tolist()
-                    #agree_targets = all_targets[agreements].tolist()
-                elif self.random_dfr:
-                    #disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.kldiv_top_proportion*2)), replace=False)
+            elif self.misclassification_dfr:
+                if not self.all_labels:
+                    disagreements = to_np(torch.topk(loss, k=int(ceil(len(kldiv)*self.proportion)))[1])
+                    agreements = to_np(torch.topk(-loss, k=int(ceil(len(kldiv)*self.proportion)))[1])
+                    disagree = all_inds[disagreements].tolist()
+                    disagree_targets = all_targets[disagreements].tolist()
+                    agree = all_inds[agreements].tolist()
+                    agree_targets = all_targets[agreements].tolist()
+                else:
+                    st_hi = to_np(torch.topk(loss, k=len(loss))[1])
+                    st_lo = to_np(torch.topk(-loss, k=len(loss))[1])
+                    disagreements = []
+                    disagree_targets = []
+                    agreements = []
+                    agree_targets = []
+                    num = int(ceil(len(loss)*self.proportion))
+
+                    # TODO: Change for >2 classes
+                    # Makes it so that if classes are imbalanced then we
+                    # oversample majority class.
+                    num_zeros = len([y for y in all_targets if y == 0])
+                    num_ones = len([y for y in all_targets if y == 1])
+                    offset = 0
+                    if num_zeros < num:
+                        offset = num - num_zeros
+                    elif num_ones < num:
+                        offset = num - num_ones
+
+                    num_targets_seen = [0, 0]
+                    for x in st_hi:
+                        target = all_targets[x]
+
+                        if num_targets_seen[target] < (num + offset) // 2:
+                            num_targets_seen[target] += 1
+                            disagreements.append(x)
+                            disagree_targets.append(target)
+
+                    num_targets_seen = [0, 0]
+                    for x in st_lo:
+                        target = all_targets[x]
+
+                        if num_targets_seen[target] < (num + offset) // 2:
+                            num_targets_seen[target] += 1
+                            agreements.append(x)
+                            agree_targets.append(target)
+
+                    disagree = all_inds[disagreements].tolist()
+                    agree = all_inds[agreements].tolist()
+            elif self.random_dfr:
+                if not self.all_labels:
+                    disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.proportion*2)), replace=False)
+                    disagree = all_inds[disagreements].tolist()
+                    disagree_targets = all_targets[disagreements].tolist()
+                    agree = []
+                    agree_targets = []
+                else:
                     inds = np.arange(len(kldiv))
                     np.random.shuffle(inds)
-                    num = int(ceil(len(kldiv)*self.kldiv_proportion))
+                    num = int(ceil(len(kldiv)*self.proportion))
                     disagreements = []
                     disagree_targets = []
 
@@ -332,51 +415,34 @@ class Disagreement(DataModule):
                     # oversample majority class.
                     num_zeros = len([y for y in all_targets if y == 0])
                     num_ones = len([y for y in all_targets if y == 1])
+
+                    offset = 0
                     if num_zeros < num:
                         offset = num - num_zeros
                     elif num_ones < num:
                         offset = num - num_ones
 
                     if (num + offset) % 2 == 1:
-                        offset -= 1 # for fair comparison with dropout which is // 2 above
+                        num -= 1 # for fair comparison with dropout which is // 2 above
 
+                    num_targets_seen = [0, 0]
                     for x in inds:
                         target = all_targets[x]
-                        if len([y for y in disagree_targets if y == target]) < num + offset:
+
+                        if num_targets_seen[target] < num + offset:
+                            num_targets_seen[target] += 1
                             disagreements.append(x)
                             disagree_targets.append(target)
 
                     disagree = all_inds[disagreements].tolist()
-                    #disagree_targets = all_targets[disagreements].tolist()
                     agree = []
                     agree_targets = []
-            else:
-                if self.gamma > 0:
-                    # Gets a gamma proportion of agreement points.
-                    num_agree = int(self.gamma * len(disagree))
-                    c = list(zip(agree, agree_targets))
-                    random.shuffle(c)
-                    agree, agree_targets = zip(*c)
-                    agree = agree[:num_agree]
-                    agree_targets = agree_targets[:num_agree]
-                    if self.disagreement_ablation:
-                        # Ablates disagreement set (just uses agreement points).
-                        # Note that we still get a gamma proportion of
-                        # agreement points first, to fix the number of data.
-                        disagree = []
-                        disagree_targets = []
-                elif self.gamma == 0:
-                    # Ablates agreement set (just uses disagreement points).
-                    agree = []
-                    agree_targets = []
-                else:
-                    raise ValueError("Gamma must be non-negative.")
-                
+
             # Converts all lists to np.ndarrays.
             disagree = np.asarray(disagree, dtype=np.int64)
-            disagree_targets = np.asarray(disagree_targets, dtype=np.int64)
+            disagree_targets = np.asarray(to_np(disagree_targets), dtype=np.int64)
             agree = np.asarray(agree, dtype=np.int64)
-            agree_targets = np.asarray(agree_targets, dtype=np.int64)
+            agree_targets = np.asarray(to_np(agree_targets), dtype=np.int64)
 
             # Adds disagreement and agreement points to indices.
             indices = np.concatenate((disagree, agree))

@@ -12,6 +12,7 @@ import torch
 from groundzero.datamodules.dataset import Dataset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.datamodules.disagreement import Disagreement
+from groundzero.utils import to_np
 
 
 class CivilCommentsDataset(Dataset):
@@ -29,7 +30,7 @@ class CivilCommentsDataset(Dataset):
         spurious_names = ["male", "female", "LGBTQ", "black", "white", "christian", "muslim", "other_religions"]
         column_names = dataset.metadata_fields
         spurious_cols = [column_names.index(name) for name in spurious_names]
-        spurious = dataset._metadata_array[:, spurious_cols].sum(-1).clip(max=1)
+        spurious = to_np(dataset._metadata_array[:, spurious_cols].sum(-1).clip(max=1))
 
         self.data = []
         self.targets = []
@@ -41,9 +42,9 @@ class CivilCommentsDataset(Dataset):
 
         self.groups = [
             np.arange(len(self.targets)),
-            np.intersect1d((~self.targets).nonzero()[0], (~spurious).nonzero()[0]),
-            np.intersect1d((~self.targets).nonzero()[0], spurious.nonzero()[0]),
-            np.intersect1d(self.targets.nonzero()[0], (~spurious).nonzero()[0]),
+            np.intersect1d((~self.targets+2).nonzero()[0], (~spurious+2).nonzero()[0]),
+            np.intersect1d((~self.targets+2).nonzero()[0], spurious.nonzero()[0]),
+            np.intersect1d(self.targets.nonzero()[0], (~spurious+2).nonzero()[0]),
             np.intersect1d(self.targets.nonzero()[0], spurious.nonzero()[0]),
         ]
         
