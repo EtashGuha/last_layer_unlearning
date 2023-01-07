@@ -22,7 +22,7 @@ class CivilCommentsDataset(Dataset):
         super().__init__(*args, **kwargs)
 
     def download(self):
-        _ = wilds.get_dataset(dataset="civilcomments", download=True, root_dir=self.root)
+        pass
 
     def load_data(self):
         dataset = wilds.get_dataset(dataset="civilcomments", download=True, root_dir=self.root)

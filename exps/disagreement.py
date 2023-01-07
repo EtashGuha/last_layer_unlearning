@@ -14,7 +14,8 @@ from pytorch_lightning import Trainer
 # Imports groundzero packages.
 from groundzero.args import add_input_args
 from groundzero.datamodules.celeba import CelebADisagreement
-from groundzero.datamodules.civilcomments import CivilComments
+from groundzero.datamodules.civilcomments import CivilCommentsDisagreement
+from groundzero.datamodules.fmow import FMOWDisagreement
 from groundzero.datamodules.waterbirds import WaterbirdsDisagreement
 from groundzero.main import load_model, main
 from groundzero.models.bert import BERT
@@ -54,9 +55,12 @@ def load_save_state(args):
     return cfg, erm_cfg, resume, erm_resume
 
 def reset_fc(model):
-    for layer in model.model.fc:
-        if hasattr(layer, "reset_parameters"):
-            layer.reset_parameters()
+    try:
+        for layer in model.model.fc:
+            if hasattr(layer, "reset_parameters"):
+                layer.reset_parameters()
+    except:
+        model.model.fc.reset_parameters()
 
 def save_metrics(cfg, metrics, names):
     # Must pass either 2 lists/tuples of the same length or 2 singletons..
@@ -111,57 +115,37 @@ def disagreement(
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
 
+    # Closure for instantiating disagreement class.
+    def disagreement_cls(orig_cls):
+        class Disagreement(orig_cls):
+            def __init__(self, args):
+                super().__init__(
+                    disagreement_args,
+                    model=model,
+                    orig_dfr=orig_dfr,
+                    misclassification_dfr=misclassification_dfr,
+                    random_dfr=random_dfr,
+                    dropout_dfr=(dropout > 0),
+                    proportion=proportion,
+                    all_labels=all_labels
+                )
+
+        return Disagreement
+
     if args.datamodule == "waterbirds":
         model = load_model(disagreement_args, ResNet)
-
-        class WaterbirdsDisagreement2(WaterbirdsDisagreement):
-            def __init__(self, args):
-                super().__init__(
-                    disagreement_args,
-                    model=model,
-                    orig_dfr=orig_dfr,
-                    misclassification_dfr=misclassification_dfr,
-                    random_dfr=random_dfr,
-                    dropout_dfr=(dropout > 0),
-                    proportion=proportion,
-                    all_labels=all_labels
-                )
-
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, WaterbirdsDisagreement2, model_hooks=[reset_fc])
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(WaterbirdsDisagreement), model_hooks=[reset_fc])
     elif args.datamodule == "celeba":
         model = load_model(disagreement_args, ResNet)
-
-        class CelebADisagreement2(CelebADisagreement):
-            def __init__(self, args):
-                super().__init__(
-                    disagreement_args,
-                    model=model,
-                    orig_dfr=orig_dfr,
-                    misclassification_dfr=misclassification_dfr,
-                    random_dfr=random_dfr,
-                    dropout_dfr=(dropout > 0),
-                    proportion=proportion,
-                    all_labels=all_labels
-                )
-
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, CelebADisagreement2, model_hooks=[reset_fc])
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(CelebADisagreement), model_hooks=[reset_fc])
+    elif args.datamodule == "fmow":
+        model = load_model(disagreement_args, ResNet)
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(FMOWDisagreement), model_hooks=[reset_fc])
     elif args.datamodule == "civilcomments":
         model = load_model(disagreement_args, BERT)
-
-        class CivilCommentsDisagreement2(CivilCommentsDisagreement):
-            def __init__(self, args):
-                super().__init__(
-                    disagreement_args,
-                    model=model,
-                    orig_dfr=orig_dfr,
-                    misclassification_dfr=misclassification_dfr,
-                    random_dfr=random_dfr,
-                    dropout_dfr=(dropout > 0),
-                    proportion=proportion,
-                    all_labels=all_labels,
-                )
-
-        _, val_metrics, test_metrics = main(finetune_args, BERT, CivilCommentsDisagreement2, model_hooks=[reset_fc])
+        _, val_metrics, test_metrics = main(finetune_args, BERT, disagreement_cls(CivilCommentsDisagreement), model_hooks=[reset_fc])
+    else:
+        raise ValueError("DataModule not supported.")
 
     return val_metrics, test_metrics
 
@@ -173,23 +157,39 @@ def experiment(args):
     ALL_LABELS = [False, True]
     PROPORTIONS = [1, 2, 5, 10, 20, 50]
     DROPOUTS = [0.5, 0.7, 0.9]
+    #ALL_LABELS = [True]
+    #PROPORTIONS = [10]
+    #DROPOUTS = [0.5]
     
     # Sets datamodule-specific parameters.
     if args.datamodule == "waterbirds":
+        model_cls = ResNet
         dm = WaterbirdsDisagreement
+        dfr_epochs = 100
         args.num_classes = 2
-        CLASS_WEIGHTS = [[1., 1.]]
+        CLASS_WEIGHTS = [[]]
         TRAIN_DIST_PROPORTION = [0.7295, 0.0384, 0.2204, 0.0117]
     elif args.datamodule == "celeba":
+        model_cls = ResNet
         dm = CelebADisagreement
+        dfr_epochs = 100
         args.num_classes = 2
         CLASS_WEIGHTS = [[1., 2.], [1., 3.], [1., 5.]]
         TRAIN_DIST_PROPORTION = [0.4295, 0.4166, 0.1447, 0.0092]
+    elif args.datamodule == "fmow":
+        model_cls = ResNet
+        dm = FMOWDisagreement
+        dfr_epochs = 100
+        args.num_classes = 62
+        CLASS_WEIGHTS = [[]]
+        TRAIN_DIST_PROPORTION = [0.2318, 0.4532, 0.0206, 0.2730, 0.0214]
     elif args.datamodule == "civilcomments":
+        model_cls = BERT
         dm = CivilCommentsDisagreement
+        dfr_epochs = 20
         args.num_classes = 2
-        CLASS_WEIGHTS = [[1., 1.]]
-        TRAIN_DIST_PROPORTION = []
+        CLASS_WEIGHTS = [[]]
+        TRAIN_DIST_PROPORTION = [0.5508, 0.3358, 0.0473, 0.0661]
 
     try:
         # Loads ERM model.
@@ -201,7 +201,7 @@ def experiment(args):
             erm_version = erm_resume["version"]
             args.weights = get_latest_weights(erm_version)
             args.resume_training = True
-        model, erm_val_metrics, erm_test_metrics = main(args, ResNet, dm)
+        model, erm_val_metrics, erm_test_metrics = main(args, model_cls, dm)
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         args.weights = ""
@@ -213,11 +213,11 @@ def experiment(args):
     args.weights = get_latest_weights(erm_version)
 
     # Loads current hyperparam search cfg if needed.
-    orig = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
-    orig[100] = {"val": 0}
-    random = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
-    miscls = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
-    dropout = {proportion: {label: {"val": 0} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    orig = {proportion: {label: {"val": -1} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    orig[100] = {"val": -1}
+    random = {proportion: {label: {"val": -1} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    miscls = {proportion: {label: {"val": -1} for label in ALL_LABELS} for proportion in PROPORTIONS}
+    dropout = {proportion: {label: {"val": -1} for label in ALL_LABELS} for proportion in PROPORTIONS}
     start_idx = 0
     if resume:
         if "orig" in resume:
@@ -239,7 +239,7 @@ def experiment(args):
         save_metrics(cfg, j, "start_idx")
 
         print(f"Original DFR Proportion 100: Class Weights {class_weights}")
-        val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights, proportion=100)
+        val_metrics, test_metrics = disagreement(args, orig_dfr=True, class_weights=class_weights, proportion=100, dfr_epochs=dfr_epochs)
 
         best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
         if best_wg_val > orig[100]["val"]:
@@ -252,7 +252,7 @@ def experiment(args):
         for all_labels in ALL_LABELS:
             for proportion in PROPORTIONS:
                 print(f"Original DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
-                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, orig_dfr=True, all_labels=all_labels)
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, orig_dfr=True, all_labels=all_labels, dfr_epochs=dfr_epochs)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                 if best_wg_val > orig[proportion][all_labels]["val"]:
@@ -261,9 +261,8 @@ def experiment(args):
                     orig[proportion][all_labels]["metrics"] = [val_metrics, test_metrics]
 
                     save_metrics(cfg, orig, "orig")
-
                 print(f"Random DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
-                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, random_dfr=True, all_labels=all_labels)
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, class_weights=class_weights, random_dfr=True, all_labels=all_labels, dfr_epochs=dfr_epochs)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                 if best_wg_val > random[proportion][all_labels]["val"]:
@@ -274,7 +273,7 @@ def experiment(args):
                     save_metrics(cfg, random, "random")
 
                 print(f"Misclassification DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels}")
-                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, misclassification_dfr=True, class_weights=class_weights, all_labels=all_labels)
+                val_metrics, test_metrics = disagreement(args, proportion=proportion/200, misclassification_dfr=True, class_weights=class_weights, all_labels=all_labels, dfr_epochs=dfr_epochs)
 
                 best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                 if best_wg_val > miscls[proportion][all_labels]["val"]:
@@ -286,7 +285,7 @@ def experiment(args):
 
                 for drop in DROPOUTS:
                     print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} All Labels {all_labels} Dropout {drop}")
-                    val_metrics, test_metrics = disagreement(args, proportion=proportion/200, dropout=drop, class_weights=class_weights, all_labels=all_labels)
+                    val_metrics, test_metrics = disagreement(args, proportion=proportion/200, dropout=drop, class_weights=class_weights, all_labels=all_labels, dfr_epochs=dfr_epochs)
 
                     best_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
                     if best_wg_val > dropout[proportion][all_labels]["val"]:
@@ -297,16 +296,6 @@ def experiment(args):
                         save_metrics(cfg, dropout, "dropout")
 
     save_metrics(cfg, len(CLASS_WEIGHTS), "start_idx")
-
-    """
-    class_weights, proportion, dropout = dropout_params
-    print("Rebalancing Ablation")
-    _, rebalancing_ablation_metrics = disagreement(args, kldiv_proportion=proportion, dropout=dropout, class_weights=class_weights, rebalancing=False)
-    print("KLDiv Bottom Ablation")
-    _, bottom_ablation_metrics = disagreement(args, kldiv_top_proportion=proportion, kldiv_bottom_proportion=0, dropout=dropout, class_weights=class_weights)
-    print("KLDiv Top Ablation")
-    _, top_ablation_metrics = disagreement(args, kldiv_top_proportion=0, kldiv_bottom_proportion=proportion, dropout=dropout, class_weights=class_weights)
-    """
 
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
@@ -330,15 +319,6 @@ def experiment(args):
             print(dropout[proportion][label]["params"])
             print_metrics(dropout[proportion][label]["metrics"][1], TRAIN_DIST_PROPORTION)
     
-    """
-    print("\nRebalancing Ablation w/ Best Dropout Config")
-    print(rebalancing_ablation_metrics)
-    print("\nKLDiv Bottom Ablation w/ Best Dropout Config")
-    print(bottom_ablation_metrics)
-    print("\nKLDiv Top Ablation w/ Best Dropout Config")
-    print(top_ablation_metrics)
-    """
-
 if __name__ == "__main__":
     parser = Parser(
         args_for_setting_config_path=["-c", "--cfg", "--config"],

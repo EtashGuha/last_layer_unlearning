@@ -17,6 +17,22 @@ from groundzero.datamodules.dataset import Subset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
+def balance_samples_per_class(totals, nums, maxed_inds=[]):
+    if np.any(totals - nums < 0):
+        # Requested too many points from certain class
+        ind = np.where(totals - nums < 0)[0][0]
+        maxed_inds.append(ind)
+
+        offset = (nums[ind] - totals[ind]) / (len(totals) - len(maxed_inds))
+        nums[ind] = totals[ind]
+        for j, _ in enumerate(nums):
+            if j not in maxed_inds:
+                nums[j] += offset
+
+        return balance_samples_per_class(totals, nums, maxed_inds=maxed_inds)
+    else:
+        # Note rounding may change total # of points
+        return np.floor(nums).astype(np.int)
 
 class Disagreement(DataModule):
     """DataModule for disagreement sets used for deep feature reweighting (DFR).
@@ -181,7 +197,7 @@ class Disagreement(DataModule):
             for group in dataset.groups[1:]:
                 nums.append(len(np.intersect1d(inds, group)))
             print(f"{label}: {nums}")
-
+    
     def disagreement(self):
         """Computes disagreement set and saves it as self.dataset_train.
         
@@ -226,28 +242,21 @@ class Disagreement(DataModule):
                 np.random.shuffle(all_inds_copy)
                 num = int(ceil(len(all_inds)*self.proportion))
 
-                # TODO: Change for >2 classes
+                totals = np.bincount(all_targets)
+                nums = [max(1, num // len(totals)) for _ in totals]
+
                 # Makes it so that if classes are imbalanced then we
                 # oversample majority class.
-                num_zeros = len([y for y in all_targets if y == 0])
-                num_ones = len([y for y in all_targets if y == 1])
+                nums = balance_samples_per_class(totals, nums)
+                nums = nums * 2 # adjust to be same as dropout
 
-                offset = 0
-                if num_zeros < num:
-                    offset = num - num_zeros
-                elif num_ones < num:
-                    offset = num - num_ones
-
-                if (num + offset) % 2 == 1:
-                    num -= 1 # for fair comparison with dropout which is // 2 above
-
-                num_targets_seen = [0, 0]
+                num_targets_seen = np.zeros(len(totals))
                 inds = []
                 targets = []
                 for x in all_inds_copy:
                     target = all_targets[x]
 
-                    if num_targets_seen[target] < num + offset:
+                    if num_targets_seen[target] < nums[target]:
                         num_targets_seen[target] += 1
                         inds.append(x)
                         targets.append(target)
@@ -295,6 +304,8 @@ class Disagreement(DataModule):
             kldiv = torch.mean(F.kl_div(torch.log(all_probs), all_orig_probs, reduction="none"), dim=1).squeeze()
             loss = F.cross_entropy(all_orig_logits, all_targets, reduction="none").squeeze()
 
+            all_targets = to_np(all_targets)
+
             del all_orig_logits
             del all_logits
             del all_orig_probs
@@ -317,31 +328,27 @@ class Disagreement(DataModule):
                     agree_targets = []
                     num = int(ceil(len(kldiv)*self.proportion))
 
-                    # TODO: Change for >2 classes
+                    totals = np.bincount(all_targets)
+                    nums = [max(1, num // len(totals)) for _ in totals]
+
                     # Makes it so that if classes are imbalanced then we
                     # oversample majority class.
-                    num_zeros = len([y for y in all_targets if y == 0])
-                    num_ones = len([y for y in all_targets if y == 1])
-                    offset = 0
-                    if num_zeros < num:
-                        offset = num - num_zeros
-                    elif num_ones < num:
-                        offset = num - num_ones
+                    nums = balance_samples_per_class(totals, nums)
 
-                    num_targets_seen = [0, 0]
+                    num_targets_seen = np.zeros(len(totals))
                     for x in st_hi:
                         target = all_targets[x]
 
-                        if num_targets_seen[target] < (num + offset) // 2:
+                        if num_targets_seen[target] < nums[target]:
                             num_targets_seen[target] += 1
                             disagreements.append(x)
                             disagree_targets.append(target)
 
-                    num_targets_seen = [0, 0]
+                    num_targets_seen = np.zeros(len(totals))
                     for x in st_lo:
                         target = all_targets[x]
 
-                        if num_targets_seen[target] < (num + offset) // 2:
+                        if num_targets_seen[target] < nums[target]:
                             num_targets_seen[target] += 1
                             agreements.append(x)
                             agree_targets.append(target)
@@ -365,31 +372,27 @@ class Disagreement(DataModule):
                     agree_targets = []
                     num = int(ceil(len(loss)*self.proportion))
 
-                    # TODO: Change for >2 classes
+                    totals = np.bincount(all_targets)
+                    nums = [max(1, num // len(totals)) for _ in totals]
+
                     # Makes it so that if classes are imbalanced then we
                     # oversample majority class.
-                    num_zeros = len([y for y in all_targets if y == 0])
-                    num_ones = len([y for y in all_targets if y == 1])
-                    offset = 0
-                    if num_zeros < num:
-                        offset = num - num_zeros
-                    elif num_ones < num:
-                        offset = num - num_ones
+                    nums = balance_samples_per_class(totals, nums)
 
-                    num_targets_seen = [0, 0]
+                    num_targets_seen = np.zeros(len(totals))
                     for x in st_hi:
                         target = all_targets[x]
 
-                        if num_targets_seen[target] < (num + offset) // 2:
+                        if num_targets_seen[target] < nums[target]:
                             num_targets_seen[target] += 1
                             disagreements.append(x)
                             disagree_targets.append(target)
 
-                    num_targets_seen = [0, 0]
+                    num_targets_seen = np.zeros(len(totals))
                     for x in st_lo:
                         target = all_targets[x]
 
-                        if num_targets_seen[target] < (num + offset) // 2:
+                        if num_targets_seen[target] < nums[target]:
                             num_targets_seen[target] += 1
                             agreements.append(x)
                             agree_targets.append(target)
@@ -410,26 +413,19 @@ class Disagreement(DataModule):
                     disagreements = []
                     disagree_targets = []
 
-                    # TODO: Change for >2 classes
+                    totals = np.bincount(all_targets)
+                    nums = [max(1, num // len(totals)) for _ in totals]
+
                     # Makes it so that if classes are imbalanced then we
                     # oversample majority class.
-                    num_zeros = len([y for y in all_targets if y == 0])
-                    num_ones = len([y for y in all_targets if y == 1])
+                    nums = balance_samples_per_class(totals, nums)
+                    nums = nums * 2 # adjust to be same as dropout
 
-                    offset = 0
-                    if num_zeros < num:
-                        offset = num - num_zeros
-                    elif num_ones < num:
-                        offset = num - num_ones
-
-                    if (num + offset) % 2 == 1:
-                        num -= 1 # for fair comparison with dropout which is // 2 above
-
-                    num_targets_seen = [0, 0]
+                    num_targets_seen = np.zeros(len(totals))
                     for x in inds:
                         target = all_targets[x]
 
-                        if num_targets_seen[target] < num + offset:
+                        if num_targets_seen[target] < nums[target]:
                             num_targets_seen[target] += 1
                             disagreements.append(x)
                             disagree_targets.append(target)

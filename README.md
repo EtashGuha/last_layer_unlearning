@@ -12,3 +12,6 @@ python -m pip install -e .
 
 ### Workflow
 Base code goes in `groundzero`. Experiment code goes in `exps`. Config files go in `cfgs`.
+
+### TODOs
+Make lazy loading option where self.data is strings (like in FMOW).

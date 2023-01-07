@@ -98,7 +98,7 @@ class Dataset(VisionDataset):
         try:
             if isinstance(datum, np.ndarray):
                 datum = Image.fromarray(datum)
-            elif isinstance(datum, str):
+            elif isinstance(datum, (str, np.str, np.str_)):
                 datum = Image.open(datum)
         except:
             pass
