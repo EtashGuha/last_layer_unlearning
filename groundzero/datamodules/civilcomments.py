@@ -60,7 +60,7 @@ class CivilComments(DataModule):
         super().__init__(args, CivilCommentsDataset, 2, **kwargs)
 
     def augmented_transforms(self):
-        return self.default_transforms()
+        return None
 
     def default_transforms(self):
         def BertTokenizeTransform(text):

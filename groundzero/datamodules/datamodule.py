@@ -219,9 +219,6 @@ class DataModule(VisionDataModule):
         if self.balanced_sampler:
             # Instantiates balanced sampler if desired.
             # TODO: Change for if labels are not (0, ..., num_classes).
-            #new_set = self.dataset_class(self.data_dir, train=True)
-            #subset_indices = new_set.train_indices
-            #targets = new_set.targets[subset_indices]
             indices = self.dataset_train.train_indices
             targets = self.dataset_train.targets[indices]
 

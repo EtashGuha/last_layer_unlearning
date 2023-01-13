@@ -17,22 +17,6 @@ from groundzero.datamodules.dataset import Subset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
 
-def balance_samples_per_class(totals, nums, maxed_inds=[]):
-    if np.any(totals - nums < 0):
-        # Requested too many points from certain class
-        ind = np.where(totals - nums < 0)[0][0]
-        maxed_inds.append(ind)
-
-        offset = (nums[ind] - totals[ind]) / (len(totals) - len(maxed_inds))
-        nums[ind] = totals[ind]
-        for j, _ in enumerate(nums):
-            if j not in maxed_inds:
-                nums[j] += offset
-
-        return balance_samples_per_class(totals, nums, maxed_inds=maxed_inds)
-    else:
-        # Note rounding may change total # of points
-        return np.floor(nums).astype(np.int)
 
 class Disagreement(DataModule):
     """DataModule for disagreement sets used for deep feature reweighting (DFR).
@@ -61,37 +45,27 @@ class Disagreement(DataModule):
         self,
         args,
         *xargs,
+        class_balancing=True,
+        class_labels_proportion=None,
         model=None,
-        orig_dfr=False,
-        misclassification_dfr=False,
-        dropout_dfr=False,
-        random_dfr=False,
-        all_labels=False,
-        proportion=None,
+        kl_ablation=None,
     ):
         """Initializes a Disagreement DataModule.
         
         Args:
             args:
+            *xargs:
             model: The groundzero.models.Model used for disagreement.
-            gamma: The proportion of agreements with which to augment disagreements.
-            orig_dfr: Whether to use group labels to perform original DFR.
-            misclassification_dfr: Whether to perform misclassification DFR.
-            dropout_dfr: Whether to perform dropout DFR.
-            disagreement_ablation: Whether to only use agreement points.
-            proportion: Proportion of samples to pick for disagreements/agreements.
         """
 
         super().__init__(args, *xargs)
- 
-        self.model = model.cuda() if model else None
+        
         self.disagreement_proportion = args.disagreement_proportion
-        self.orig_dfr = orig_dfr
-        self.misclassification_dfr = misclassification_dfr
-        self.dropout_dfr = dropout_dfr
-        self.random_dfr = random_dfr
-        self.all_labels = all_labels
-        self.proportion = proportion
+        self.dfr_type = args.dfr_type if hasattr(args, "dfr_type") else None
+        self.class_balancing = class_balancing
+        self.class_labels_proportion = class_labels_proportion
+        self.model = model.cuda() if model else None
+        self.kl_ablation = kl_ablation
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -105,22 +79,11 @@ class Disagreement(DataModule):
     def _split_dataset(self, dataset, disagreement_proportion=None, train=True):
         """Splits dataset into training and validation subsets.
 
-        If disagreement_proportion is specified, uses that proportion of the
-        dataset for disagreement and the rest as normal. For example, one could
-        use half the val dataset for disagreement and the remaining half for
-        validation. The exception is if disagreement_proportion == 1; in this
-        case, the entire set will be used for disagreement and as usual. This
-        is useful for doing disagreement on the train dataset, where we want
-        to use the whole dataset for training and then check our disagreements
-        against a resource-constrained model.
-        
         Args:
             dataset: A groundzero.datamodules.Dataset.
             disagreement_proportion: The proportion of the dataset for disagreement.
-            train: Whether to return the train set or val set.
 
         Returns:
-            A torch.utils.data.Subset of the given dataset with the desired split.
         """
 
         inds = dataset.train_indices if train else dataset.val_indices
@@ -145,7 +108,7 @@ class Disagreement(DataModule):
     def train_dataloader(self):
         """Returns DataLoader for the train dataset (after disagreement)."""
 
-        if self.orig_dfr:
+        if self.dfr_type == "orig":
             # Does group balancing for original DFR.
             indices = self.dataset_train.train_indices
             groups = np.zeros(len(indices), dtype=np.int32)
@@ -158,9 +121,12 @@ class Disagreement(DataModule):
             label_weights = 1. / counts
             weights = label_weights[groups]
             sampler = WeightedRandomSampler(weights, len(weights))
-
             return self._data_loader(self.dataset_train, sampler=sampler)
+        elif self.class_balancing:
+            self.balanced_sampler = True
+            return super().train_dataloader()
         else:
+            self.balanced_sampler = False
             return super().train_dataloader()
 
     def disagreement_dataloader(self):
@@ -178,7 +144,6 @@ class Disagreement(DataModule):
             agree: An np.ndarray of all agreed indices.
             indices: An optional np.ndarray of final indices used for DFR.
         """
-
         if indices is not None:
             labels_and_inds = zip(
                 ("All", "Disagreements", "Agreements", "Final DFR Set"),
@@ -201,7 +166,7 @@ class Disagreement(DataModule):
     def disagreement(self):
         """Computes disagreement set and saves it as self.dataset_train.
         
-        self.dataset_disagreement is initially  the self.disagreement_proportion
+        self.dataset_disagreement is initially the self.disagreement_proportion
         of the held-out set. Here, we perform some computation (i.e., the actual
         disagreement) on self.dataset_disagreement to get indices for DFR. Then,
         we set these indices as self.dataset_train for DFR training.
@@ -223,55 +188,27 @@ class Disagreement(DataModule):
 
         all_inds = dataloader.dataset.val_indices
 
-        if self.orig_dfr:
+        if self.dfr_type in ("orig", "random"):
             targets = []
             for batch in dataloader:
                 targets.extend(to_np(batch[1]))
 
-            if not self.all_labels:
-                if self.proportion == 100:
-                    targets = np.asarray(targets)
-                    indices = all_inds
-                else:
-                    inds = np.random.choice(np.arange(len(all_inds)), size=int(ceil(len(all_inds)*self.proportion*2)), replace=False)
-                    targets = np.asarray(targets)[inds]
-                    indices = all_inds[inds]
-            else:
-                all_inds_copy = np.arange(len(all_inds))
-                all_targets = np.asarray(targets)
-                np.random.shuffle(all_inds_copy)
-                num = int(ceil(len(all_inds)*self.proportion))
-
-                totals = np.bincount(all_targets)
-                nums = [max(1, num // len(totals)) for _ in totals]
-
-                # Makes it so that if classes are imbalanced then we
-                # oversample majority class.
-                nums = balance_samples_per_class(totals, nums)
-                nums = nums * 2 # adjust to be same as dropout
-
-                num_targets_seen = np.zeros(len(totals))
-                inds = []
-                targets = []
-                for x in all_inds_copy:
-                    target = all_targets[x]
-
-                    if num_targets_seen[target] < nums[target]:
-                        num_targets_seen[target] += 1
-                        inds.append(x)
-                        targets.append(target)
-
-                indices = all_inds[inds]
-                targets = np.asarray(targets)
-
-        else:
+            inds = np.random.choice(
+                np.arange(len(all_inds)),
+                size=int(ceil(len(all_inds)*self.class_labels_proportion)),
+                replace=False,
+            )
+            indices = all_inds[inds]
+            targets = to_np(targets)[inds]
+        elif self.dfr_type in ("miscls", "dropout"):
             all_orig_logits = []
             all_logits = []
             all_orig_probs = []
             all_probs = []
             all_targets = []
 
-            # Performs misclassifiation or dropout disagreements with self.model.
+            # Performs misclassification or dropout disagreements with self.model.
+            # TODO: Separate the two so we don't waste compute on miscls.
             with torch.no_grad():
                 for i, batch in enumerate(dataloader):
                     inputs, targets = batch
@@ -311,137 +248,36 @@ class Disagreement(DataModule):
             del all_orig_probs
             del all_probs
 
-            if self.dropout_dfr:
-                if not self.all_labels:
-                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.proportion)))[1])
-                    agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.proportion)))[1])
-                    disagree = all_inds[disagreements].tolist()
-                    disagree_targets = all_targets[disagreements].tolist()
-                    agree = all_inds[agreements].tolist()
-                    agree_targets = all_targets[agreements].tolist()
-                else:
-                    st_hi = to_np(torch.topk(kldiv, k=len(kldiv))[1])
-                    st_lo = to_np(torch.topk(-kldiv, k=len(kldiv))[1])
-                    disagreements = []
-                    disagree_targets = []
-                    agreements = []
-                    agree_targets = []
-                    num = int(ceil(len(kldiv)*self.proportion))
+            if self.dfr_type == "dropout":
+                if not self.kl_ablation:
+                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                    agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                elif self.kl_ablation == "top":
+                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion)))[1])
+                    agreements = np.asarray([])
+                elif self.kl_ablation == "random":
+                    disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                    agreements = np.random.choice(
+                        np.delete(np.arange(len(kldiv)), disagreements),
+                        size=int(ceil(len(kldiv)*self.class_labels_proportion // 2)),
+                        replace=False,
+                    )
+            elif self.dfr_type == "miscls":
+                disagreements = to_np(torch.topk(loss, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                agreements = to_np(torch.topk(-loss, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
 
-                    totals = np.bincount(all_targets)
-                    nums = [max(1, num // len(totals)) for _ in totals]
-
-                    # Makes it so that if classes are imbalanced then we
-                    # oversample majority class.
-                    nums = balance_samples_per_class(totals, nums)
-
-                    num_targets_seen = np.zeros(len(totals))
-                    for x in st_hi:
-                        target = all_targets[x]
-
-                        if num_targets_seen[target] < nums[target]:
-                            num_targets_seen[target] += 1
-                            disagreements.append(x)
-                            disagree_targets.append(target)
-
-                    num_targets_seen = np.zeros(len(totals))
-                    for x in st_lo:
-                        target = all_targets[x]
-
-                        if num_targets_seen[target] < nums[target]:
-                            num_targets_seen[target] += 1
-                            agreements.append(x)
-                            agree_targets.append(target)
-
-                    disagree = all_inds[disagreements].tolist()
-                    agree = all_inds[agreements].tolist()
-            elif self.misclassification_dfr:
-                if not self.all_labels:
-                    disagreements = to_np(torch.topk(loss, k=int(ceil(len(kldiv)*self.proportion)))[1])
-                    agreements = to_np(torch.topk(-loss, k=int(ceil(len(kldiv)*self.proportion)))[1])
-                    disagree = all_inds[disagreements].tolist()
-                    disagree_targets = all_targets[disagreements].tolist()
-                    agree = all_inds[agreements].tolist()
-                    agree_targets = all_targets[agreements].tolist()
-                else:
-                    st_hi = to_np(torch.topk(loss, k=len(loss))[1])
-                    st_lo = to_np(torch.topk(-loss, k=len(loss))[1])
-                    disagreements = []
-                    disagree_targets = []
-                    agreements = []
-                    agree_targets = []
-                    num = int(ceil(len(loss)*self.proportion))
-
-                    totals = np.bincount(all_targets)
-                    nums = [max(1, num // len(totals)) for _ in totals]
-
-                    # Makes it so that if classes are imbalanced then we
-                    # oversample majority class.
-                    nums = balance_samples_per_class(totals, nums)
-
-                    num_targets_seen = np.zeros(len(totals))
-                    for x in st_hi:
-                        target = all_targets[x]
-
-                        if num_targets_seen[target] < nums[target]:
-                            num_targets_seen[target] += 1
-                            disagreements.append(x)
-                            disagree_targets.append(target)
-
-                    num_targets_seen = np.zeros(len(totals))
-                    for x in st_lo:
-                        target = all_targets[x]
-
-                        if num_targets_seen[target] < nums[target]:
-                            num_targets_seen[target] += 1
-                            agreements.append(x)
-                            agree_targets.append(target)
-
-                    disagree = all_inds[disagreements].tolist()
-                    agree = all_inds[agreements].tolist()
-            elif self.random_dfr:
-                if not self.all_labels:
-                    disagreements = np.random.choice(np.arange(len(kldiv)), size=int(ceil(len(kldiv)*self.proportion*2)), replace=False)
-                    disagree = all_inds[disagreements].tolist()
-                    disagree_targets = all_targets[disagreements].tolist()
-                    agree = []
-                    agree_targets = []
-                else:
-                    inds = np.arange(len(kldiv))
-                    np.random.shuffle(inds)
-                    num = int(ceil(len(kldiv)*self.proportion))
-                    disagreements = []
-                    disagree_targets = []
-
-                    totals = np.bincount(all_targets)
-                    nums = [max(1, num // len(totals)) for _ in totals]
-
-                    # Makes it so that if classes are imbalanced then we
-                    # oversample majority class.
-                    nums = balance_samples_per_class(totals, nums)
-                    nums = nums * 2 # adjust to be same as dropout
-
-                    num_targets_seen = np.zeros(len(totals))
-                    for x in inds:
-                        target = all_targets[x]
-
-                        if num_targets_seen[target] < nums[target]:
-                            num_targets_seen[target] += 1
-                            disagreements.append(x)
-                            disagree_targets.append(target)
-
-                    disagree = all_inds[disagreements].tolist()
-                    agree = []
-                    agree_targets = []
-
-            # Converts all lists to np.ndarrays.
-            disagree = np.asarray(disagree, dtype=np.int64)
-            disagree_targets = np.asarray(to_np(disagree_targets), dtype=np.int64)
-            agree = np.asarray(agree, dtype=np.int64)
-            agree_targets = np.asarray(to_np(agree_targets), dtype=np.int64)
-
-            # Adds disagreement and agreement points to indices.
-            indices = np.concatenate((disagree, agree))
+            disagree = all_inds[disagreements].tolist()
+            disagree_targets = all_targets[disagreements].tolist()
+            if len(agreements) > 0: # necessary for top kl ablation
+                agree = all_inds[agreements].tolist()
+                agree_targets = all_targets[agreements].tolist()
+                indices = np.concatenate((disagree, agree))
+            else:
+                agree = []
+                agree_targets = []
+                indices = np.asarray(disagree)
+        else:
+            raise ValueError("DFR type not supported.")
 
         # Uses disagreement set as new training set for DFR.
         new_set.train_indices = new_set.val_indices

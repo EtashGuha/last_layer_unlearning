@@ -83,12 +83,19 @@ class BERT(Model):
             eps=1e-8,
         )
 
-        scheduler = get_scheduler(
-            "linear",
-            optimizer=optimizer,
-            num_warmup_steps=0,
-            num_training_steps=self.hparams.max_epochs, # should be steps?
-        )
+        if self.hparams.lr_scheduler == "linear":
+            scheduler = get_scheduler(
+                "linear",
+                optimizer=optimizer,
+                num_warmup_steps=0,
+                num_training_steps=self.hparams.max_epochs,
+            )
 
-        return optimizer
+            return [optimizer], [scheduler]
+        else:
+            # Scheduler not implemented
+            self.hparams.lr_scheduler = None
+            self.hparams.lr_steps = []
+
+            return optimizer
 
