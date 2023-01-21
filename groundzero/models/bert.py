@@ -7,7 +7,7 @@ import types
 from transformers import BertForSequenceClassification, get_scheduler
 
 # Imports PyTorch packages.
-from torch.optim import AdamW
+from torch.optim import SGD
 
 # Imports groundzero packages.
 from groundzero.models.model import Model
@@ -54,9 +54,6 @@ class BERT(Model):
         return f"Loading BERT Base Uncased pretrained on Book Corpus and English Wikipedia."
 
     def configure_optimizers(self):
-        if self.hparams.optimizer != "adamw":
-            raise NotImplementedError
-
         no_decay = ["bias", "LayerNorm.weight"]
         decay_params = []
         nodecay_params = []
@@ -77,11 +74,12 @@ class BERT(Model):
             },
         ]
 
-        optimizer = AdamW(
+        optimizer = self.optimizer(
             optimizer_grouped_parameters,
             lr=self.hparams.lr,
-            eps=1e-8,
         )
+        if isinstance(optimizer, SGD):
+            optimizer.momentum = self.hparams.momentum
 
         if self.hparams.lr_scheduler == "linear":
             scheduler = get_scheduler(
@@ -94,7 +92,7 @@ class BERT(Model):
             return [optimizer], [scheduler]
         else:
             # Scheduler not implemented
-            self.hparams.lr_scheduler = None
+            self.hparams.lr_scheduler = "step"
             self.hparams.lr_steps = []
 
             return optimizer

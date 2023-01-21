@@ -16,15 +16,22 @@ from groundzero.args import add_input_args
 from groundzero.datamodules.celeba import CelebADisagreement
 from groundzero.datamodules.civilcomments import CivilCommentsDisagreement
 from groundzero.datamodules.fmow import FMOWDisagreement
+from groundzero.datamodules.multinli import MultiNLIDisagreement
 from groundzero.datamodules.waterbirds import WaterbirdsDisagreement
 from groundzero.main import load_model, main
 from groundzero.models.bert import BERT
 from groundzero.models.resnet import ResNet
 
 
-def get_latest_weights(version):
+def get_weights(version, key="latest"):
     list_of_weights = glob(osp.join(os.getcwd(), f"lightning_logs/version_{version}/checkpoints/*"))
-    return max(list_of_weights, key=osp.getctime)
+    list_of_weights = sorted([w for w in list_of_weights if "best" not in w])
+    if key == "latest":
+        return list_of_weights[-1]
+    elif key == "earliest":
+        return list_of_weights[0]
+    else:
+        raise NotImplementedError
 
 def load_save_state(args):
     # Instantiates save state.
@@ -101,6 +108,7 @@ def dfr(
     dfr_epochs=100,
     dropout_prob=None,
     kl_ablation=None,
+    early_stop_weights=None,
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dfr_type = dfr_type
@@ -108,13 +116,18 @@ def dfr(
 
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
-    finetune_args.check_val_every_n_epoch = dfr_epochs
-    finetune_args.ckpt_every_n_epochs = dfr_epochs
+    finetune_args.check_val_every_n_epoch = dfr_epochs + 1 # change to dfr_epochs to save model
+    finetune_args.ckpt_every_n_epochs = dfr_epochs + 1 # change to dfr_epochs to save model
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
     finetune_args.lr = 1e-3
     finetune_args.lr_scheduler = "step"
     finetune_args.lr_steps = []
+
+    early_stop_model = None
+    if early_stop_weights:
+        early_args = deepcopy(disagreement_args)
+        early_args.weights = early_stop_weights
 
     def disagreement_cls(orig_cls):
         class Disagreement(orig_cls):
@@ -122,6 +135,7 @@ def dfr(
                 super().__init__(
                     disagreement_args,
                     model=model,
+                    early_stop_model=early_stop_model,
                     class_balancing=class_balancing,
                     class_labels_proportion=class_labels_proportion,
                     kl_ablation=kl_ablation,
@@ -131,16 +145,30 @@ def dfr(
 
     if args.datamodule == "waterbirds":
         model = load_model(disagreement_args, ResNet)
+        if early_stop_weights:
+            early_stop_model = load_model(early_args, ResNet)
         _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(WaterbirdsDisagreement), model_hooks=[reset_fc])
     elif args.datamodule == "celeba":
         model = load_model(disagreement_args, ResNet)
+        if early_stop_weights:
+            early_stop_model = load_model(early_args, ResNet)
         _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(CelebADisagreement), model_hooks=[reset_fc])
     elif args.datamodule == "fmow":
         model = load_model(disagreement_args, ResNet)
-        _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(FMOWDisagreement), model_hooks=[reset_fc])
+        if early_stop_weights:
+            early_stop_model = load_model(early_args, ResNet)
+        #_, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(FMOWDisagreement), model_hooks=[reset_fc])
+        _, val_metrics, test_metrics = main(finetune_args, ResNet, disagreement_cls(FMOWDisagreement))
     elif args.datamodule == "civilcomments":
         model = load_model(disagreement_args, BERT)
+        if early_stop_weights:
+            early_stop_model = load_model(early_args, BERT)
         _, val_metrics, test_metrics = main(finetune_args, BERT, disagreement_cls(CivilCommentsDisagreement), model_hooks=[reset_fc])
+    elif args.datamodule == "multinli":
+        model = load_model(disagreement_args, BERT)
+        if early_stop_weights:
+            early_stop_model = load_model(early_args, BERT)
+        _, val_metrics, test_metrics = main(finetune_args, BERT, disagreement_cls(MultiNLIDisagreement), model_hooks=[reset_fc])
     else:
         raise ValueError("DataModule not supported.")
 
@@ -151,8 +179,10 @@ def experiment(args):
     cfg, erm_cfg, resume, erm_resume = load_save_state(args)
 
     # Sets search parameters.
-    PROPORTIONS = [1, 2, 5, 10, 20, 50]
-    DROPOUT_PROBS = [0.5, 0.7, 0.9]
+    #PROPORTIONS = [1, 2, 5, 10, 20, 50]
+    PROPORTIONS = [10, 20, 50, 100]
+    #DROPOUT_PROBS = [0.5, 0.7, 0.9]
+    DROPOUT_PROBS = [0.9]
     
     # Sets datamodule-specific parameters.
     if args.datamodule == "waterbirds":
@@ -183,6 +213,15 @@ def experiment(args):
         args.num_classes = 2
         CLASS_WEIGHTS = [[]]
         TRAIN_DIST_PROPORTION = [0.5508, 0.3358, 0.0473, 0.0661]
+    elif args.datamodule == "multinli":
+        model_cls = BERT
+        dm = MultiNLIDisagreement
+        dfr_epochs = 20
+        args.num_classes = 3
+        CLASS_WEIGHTS = [[]]
+        TRAIN_DIST_PROPORTION = [0.2789, 0.0541, 0.3267, 0.0074, 0.3232, 0.0097]
+    else:
+        raise ValueError("DataModule not supported.")
 
     try:
         # Loads ERM model.
@@ -192,7 +231,7 @@ def experiment(args):
         # Resumes ERM training if interrupted (need to manually add version).
         if erm_resume:
             erm_version = erm_resume["version"]
-            args.weights = get_latest_weights(erm_version)
+            args.weights = get_weights(erm_version, key="latest")
             args.resume_training = True
         model, erm_val_metrics, erm_test_metrics = main(args, model_cls, dm)
         erm_version = model.trainer.logger.version
@@ -203,12 +242,15 @@ def experiment(args):
 
         save_metrics(erm_cfg, (erm_version, erm_metrics), ("version", "metrics"))
  
-    args.weights = get_latest_weights(erm_version)
+    #args.weights = get_weights(erm_version, key="latest")
+    args.weights = get_weights(erm_version, key="earliest")
+    early_stop_weights = get_weights(erm_version, key="earliest")
 
     # Loads current hyperparam search cfg if needed.
     orig = {proportion: {label: {"val": -1} for label in [True, False]} for proportion in PROPORTIONS}
     random = deepcopy(orig)
     miscls = deepcopy(orig)
+    earlystop = deepcopy(orig)
     dropout = deepcopy(orig)
     orig.update({100: {label: {"val": -1} for label in [True, False]}})
     random.update({100: {label: {"val": -1} for label in [True, False]}})
@@ -216,9 +258,10 @@ def experiment(args):
         orig = resume["orig"] if "orig" in resume else orig
         random = resume["random"] if "random" in resume else random
         miscls = resume["miscls"] if "miscls" in resume else miscls
+        earlystop = resume["earlystop"] if "earlystop" in resume else earlystop
         dropout = resume["dropout"] if "dropout" in resume else dropout
 
-    results = {"orig": orig, "random": random, "miscls": miscls, "dropout": dropout}
+    results = {"orig": orig, "random": random, "miscls": miscls, "earlystop": earlystop, "dropout": dropout}
     def dfr_helper(
         args,
         dfr_type,
@@ -227,16 +270,20 @@ def experiment(args):
         class_weights=[],
         dropout_prob=0,
         kl_ablation=None,
+        early_stop_weights=None,
     ):
         val_metrics, test_metrics = dfr(
             args,
             dfr_type,
-            class_labels_proportion / 100,
+            #class_labels_proportion / 100,
+            class_labels_proportion,
             class_balancing=class_balancing,
             class_weights=class_weights,
-            dfr_epochs=dfr_epochs,
+            #dfr_epochs=dfr_epochs,
+            dfr_epochs=2000//class_labels_proportion, #just a guess
             dropout_prob=dropout_prob,
             kl_ablation=kl_ablation,
+            early_stop_weights=early_stop_weights,
         )
 
         worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
@@ -245,10 +292,11 @@ def experiment(args):
             params = [class_weights, dropout_prob] if dropout_prob else [class_weights]
             results[dfr_type][class_labels_proportion][class_balancing]["params"] = params
             results[dfr_type][class_labels_proportion][class_balancing]["metrics"] = [val_metrics, test_metrics]
-            save_metrics(cfg, results[dfr_type], dfr_type)
+            #save_metrics(cfg, results[dfr_type], dfr_type)
 
     # Does hyperparameter search based on worst group validation error.
     for class_weights in CLASS_WEIGHTS:
+        """
         print(f"Group-Balanced DFR Proportion 100: Class Weights {class_weights}")
         dfr_helper(args, "orig", 100, class_weights=class_weights)
 
@@ -257,8 +305,10 @@ def experiment(args):
 
         print(f"Unbalanced DFR Proportion 100: Class Weights {class_weights}")
         dfr_helper(args, "random", 100, class_balancing=False, class_weights=class_weights) 
+        """
 
         for proportion in PROPORTIONS:
+            """
             print(f"Group-Balanced DFR Proportion {proportion}: Class Weights {class_weights}")
             dfr_helper(args, "orig", proportion, class_weights=class_weights)
 
@@ -268,11 +318,15 @@ def experiment(args):
             print(f"Misclassification DFR Proportion {proportion}: Class Weights {class_weights}")
             dfr_helper(args, "miscls", proportion, class_weights=class_weights)
 
+            print(f"Early Stop DFR Proportion {proportion}: Class Weights {class_weights}")
+            dfr_helper(args, "earlystop", proportion, class_weights=class_weights, early_stop_weights=early_stop_weights)
+            """
+
             for dropout_prob in DROPOUT_PROBS:
                 print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} Dropout {dropout_prob}")
                 dfr_helper(args, "dropout", proportion, class_weights=class_weights, dropout_prob=dropout_prob)
-
                 """
+    
                 print(f"Dropout DFR Proportion {proportion}: Class Weights {class_weights} Dropout {dropout_prob} TOP")
                 dfr_helper(args, "dropout", proportion, class_weights=class_weights, dropout_prob=dropout_prob, kl_ablation="top")
 
@@ -285,6 +339,7 @@ def experiment(args):
     print("\n---Hyperparameter Search Results---")
     print("\nERM:")
     print_metrics(erm_metrics[1], TRAIN_DIST_PROPORTION)
+    """
     print("\nGroup-Balanced DFR Proportion 100:")
     print(orig[100][True]["params"])
     print_metrics(orig[100][True]["metrics"][1], TRAIN_DIST_PROPORTION)
@@ -294,6 +349,7 @@ def experiment(args):
     print("\nUnbalanced DFR Proportion 100:")
     print(random[100][False]["params"])
     print_metrics(random[100][False]["metrics"][1], TRAIN_DIST_PROPORTION)
+    """
 
     for proportion in PROPORTIONS:
         print(f"\nGroup-Balanced DFR Proportion {proportion}:")
@@ -305,6 +361,9 @@ def experiment(args):
         print(f"\nMisclassification DFR Proportion {proportion}:")
         print(miscls[proportion][True]["params"])
         print_metrics(miscls[proportion][True]["metrics"][1], TRAIN_DIST_PROPORTION)
+        print(f"\nEarly Stop DFR Proportion {proportion}:")
+        print(earlystop[proportion][True]["params"])
+        print_metrics(earlystop[proportion][True]["metrics"][1], TRAIN_DIST_PROPORTION)
         print(f"\nDropout DFR Proportion {proportion}:")
         print(dropout[proportion][True]["params"])
         print_metrics(dropout[proportion][True]["metrics"][1], TRAIN_DIST_PROPORTION)
