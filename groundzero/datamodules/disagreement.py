@@ -45,12 +45,12 @@ class Disagreement(DataModule):
         self,
         args,
         *xargs,
-        class_balancing=True,
-        class_labels_num=None,
+        num_data=None,
         model=None,
-        early_stop_model=None,
+        earlystop_model=None,
         kl_ablation=None,
         gamma=None,
+        class_balancing=False,
     ):
         """Initializes a Disagreement DataModule.
         
@@ -62,13 +62,13 @@ class Disagreement(DataModule):
 
         super().__init__(args, *xargs)
         
-        self.disagreement_proportion = args.disagreement_proportion
+        self.disagreement_proportion = 0.5
         self.dfr_type = args.dfr_type if hasattr(args, "dfr_type") else None
-        self.class_balancing = class_balancing
-        self.class_labels_proportion = class_labels_num
+        self.num_data = num_data
         self.model = model.cuda() if model else None
-        self.early_stop_model = early_stop_model.cuda() if early_stop_model else None
+        self.earlystop_model = earlystop_model.cuda() if earlystop_model else None
         self.kl_ablation = kl_ablation
+        self.class_balancing = class_balancing
         self.gamma = gamma
 
     def load_msg(self):
@@ -130,16 +130,17 @@ class Disagreement(DataModule):
             self.balanced_sampler = True
             return super().train_dataloader()
         else:
-            self.balanced_sampler = False
             return super().train_dataloader()
 
     def val_dataloader(self):
         dataloaders = super().val_dataloader()
-        return dataloaders[1:] # remove group 0
+        return dataloaders
+        #return dataloaders[1:] # remove group 0
 
     def test_dataloader(self):
         dataloaders = super().test_dataloader()
-        return dataloaders[1:] # remove group 0
+        return dataloaders
+        #return dataloaders[1:] # remove group 0
 
     def disagreement_dataloader(self):
         """Returns DataLoader for the disagreement set."""
@@ -205,14 +206,14 @@ class Disagreement(DataModule):
             for batch in dataloader:
                 targets.extend(to_np(batch[1]))
 
-            if self.class_labels_proportion == "all":
+            if self.num_data == "all":
                 p = len(all_inds)
             else:
-                p = self.class_labels_proportion
+                p = self.num_data
 
             inds = np.random.choice(
                 np.arange(len(all_inds)),
-                #size=int(ceil(len(all_inds)*self.class_labels_proportion)),
+                #size=int(ceil(len(all_inds)*self.num_data)),
                 size=p,
                 replace=False,
             )
@@ -241,8 +242,8 @@ class Disagreement(DataModule):
                     targets = targets.cuda()
 
                     if self.dfr_type in ("earlystop_dropout", "earlystop_miscls"):
-                        self.early_stop_model.eval()
-                        orig_logits = self.early_stop_model(inputs)
+                        self.earlystop_model.eval()
+                        orig_logits = self.earlystop_model(inputs)
                         orig_probs = F.softmax(orig_logits, dim=1)
                         orig_preds = torch.argmax(orig_probs, dim=1)
                     else:
@@ -255,10 +256,10 @@ class Disagreement(DataModule):
                         self.model.train()
                         logits = self.model(inputs)
                     elif self.dfr_type == "earlystop":
-                        logits = self.early_stop_model(inputs)
+                        logits = self.earlystop_model(inputs)
                     elif self.dfr_type == "earlystop_dropout":
-                        self.early_stop_model.train()
-                        logits = self.early_stop_model(inputs)
+                        self.earlystop_model.train()
+                        logits = self.earlystop_model(inputs)
                     else:
                         # Dummy prediction for misclassification.
                         logits = self.model(inputs)
@@ -334,17 +335,17 @@ class Disagreement(DataModule):
             sys.exit(0)
             """
 
-            top_num = int(self.class_labels_proportion * self.gamma)
+            top_num = int(self.num_data * self.gamma)
             if self.gamma == 1:
                 bottom_num = 0
                 agreements = []
             else:
-                bottom_num = int(self.class_labels_proportion * (1 - self.gamma))
+                bottom_num = int(self.num_data * (1 - self.gamma))
 
             if "dropout" in self.dfr_type or self.dfr_type == "earlystop":
                 if not self.kl_ablation:
-                    #disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
-                    #agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                    #disagreements = to_np(torch.topk(kldiv, k=int(ceil(len(kldiv)*self.num_data // 2)))[1])
+                    #agreements = to_np(torch.topk(-kldiv, k=int(ceil(len(kldiv)*self.num_data // 2)))[1])
                     disagreements = to_np(torch.topk(kldiv, k=top_num)[1])
                     if bottom_num:
                         agreements = to_np(torch.topk(-kldiv, k=bottom_num)[1])
@@ -357,8 +358,8 @@ class Disagreement(DataModule):
                         )
                     """
             elif "miscls" in self.dfr_type:
-                #disagreements = to_np(torch.topk(loss, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
-                #agreements = to_np(torch.topk(-loss, k=int(ceil(len(kldiv)*self.class_labels_proportion // 2)))[1])
+                #disagreements = to_np(torch.topk(loss, k=int(ceil(len(kldiv)*self.num_data // 2)))[1])
+                #agreements = to_np(torch.topk(-loss, k=int(ceil(len(kldiv)*self.num_data // 2)))[1])
                 disagreements = to_np(torch.topk(loss, k=top_num)[1])
                 if bottom_num:
                     agreements = to_np(torch.topk(-loss, k=bottom_num)[1])

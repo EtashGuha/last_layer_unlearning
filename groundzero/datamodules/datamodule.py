@@ -101,6 +101,9 @@ class DataModule(VisionDataModule):
         if self.label_noise:
             msg = msg[:-1] + f" and {int(self.label_noise * 100)}% label noise."
 
+        if self.balanced_sampler:
+            msg = msg[:-1] + " with a balanced sampler."
+
         return msg
 
     def train_preprocess(self, dataset_train, dataset_val):
@@ -217,7 +220,6 @@ class DataModule(VisionDataModule):
         """Returns DataLoader for the train dataset."""
 
         if self.balanced_sampler:
-            # Instantiates balanced sampler if desired.
             # TODO: Change for if labels are not (0, ..., num_classes).
             indices = self.dataset_train.train_indices
             targets = self.dataset_train.targets[indices]
