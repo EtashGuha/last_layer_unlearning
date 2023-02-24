@@ -74,8 +74,8 @@ def reset_fc_hook(model):
 
 def print_metrics(test_metrics, train_dist_proportion):
     #train_dist_mean_acc = sum([p * group[f"test_acc1/dataloader_idx_{j+1}"] for j, (group, p) in enumerate(zip(test_metrics[1:], train_dist_proportion))])
-    #worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
-    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(test_metrics)]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
+    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
+    #worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(test_metrics)]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
 
     """
     test_dist_mean_acc = test_metrics[0]["test_acc1/dataloader_idx_0"]
@@ -151,16 +151,19 @@ def experiment(args, model_class):
     curr_state = state[args.datamodule][args.seed]
 
     # Sets global parameters.
-    ERM_CLASS_BALANCING = False
+    ERM_CLASS_BALANCING = True
     ERM_CLASS_WEIGHTS = ()
     CLASS_BALANCING = False
+    COMBINE_VAL_SET_FOR_ERM = True
+
     CLASS_WEIGHTS = ()
     NUM_DATAS = [10, 20, 50, 100, 200]
 
     # Sets search parameters.
     RESET_FC = [False]
     DFR_EPOCH_NUMS = [5000]
-    DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2]
+    #DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2]
+    DFR_LRS = [1e-3]
     GAMMA = [1]
     EARLYSTOP_NUMS = [1, 2, 5]
     DROPOUT_PROBS = [0.5, 0.7, 0.9]
@@ -169,19 +172,23 @@ def experiment(args, model_class):
     datamodule_class, num_classes, train_dist_proportion = get_datamodule_parameters(args.datamodule)
     args.num_classes = num_classes
 
-    erm_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"]
+    erm_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]
     dfn_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]
 
     # Trains ERM model.
     erm_version = erm_state["version"]
     erm_metrics = erm_state["metrics"]
-    if not erm_version or not erm_metrics:
+    if erm_version == -1 or erm_metrics == []:
         args.balanced_sampler = ERM_CLASS_BALANCING
+        args.combine_val_set = COMBINE_VAL_SET_FOR_ERM
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class)
+        args.combine_val_set = False
+
         erm_state["version"] = model.trainer.logger.version
         erm_state["metrics"] = [erm_val_metrics, erm_test_metrics]
         dump_state(state)
         del model
+    return
  
     # Gets last-epoch ERM weights.
     args.weights = get_weights(erm_version, ind=-1)
@@ -232,8 +239,8 @@ def experiment(args, model_class):
         else:
             dfr_state = dfn_state[dfr_type][num_data]
 
-        #worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j}"] for j, group in enumerate(val_metrics)])
+        worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+        #worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j}"] for j, group in enumerate(val_metrics)])
         if worst_wg_val >= dfr_state["val"]:
             if dfr_epoch_num:
                 params = [dfr_epoch_num, dfr_lr]
@@ -254,11 +261,11 @@ def experiment(args, model_class):
 
     # Does hyperparameter search based on worst group validation error.
     for dfr_lr in DFR_LRS:
-        print(f"Group-Balanced Full DFR: LR {dfr_lr}")
-        dfr_helper("orig", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
+        #print(f"Group-Balanced Full DFR: LR {dfr_lr}")
+        #dfr_helper("orig", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
 
-        #print(f"Group-Unbalanced Full DFR: LR {dfr_lr}")
-        #dfr_helper("random", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
+        print(f"Group-Unbalanced Full DFR: LR {dfr_lr}")
+        dfr_helper("random", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
         continue
 
         for reset_fc in RESET_FC:
@@ -296,6 +303,7 @@ def experiment(args, model_class):
     print("\nGroup-Unbalanced Full DFR:")
     print(dfn_state["dfr"][False]["params"])
     print_metrics(dfn_state["dfr"][False]["metrics"][1], train_dist_proportion)
+    return
 
     for num_data in NUM_DATAS:
         #print(f"\nGroup-Balanced DFR {num}:")

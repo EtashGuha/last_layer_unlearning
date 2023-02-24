@@ -64,6 +64,7 @@ class Disagreement(DataModule):
         
         self.disagreement_proportion = 0.5
         self.dfr_type = args.dfr_type if hasattr(args, "dfr_type") else None
+        self.combine_val_set = args.combine_val_set if hasattr(args, "combine_val_set") else False
         self.num_data = num_data
         self.model = model.cuda() if model else None
         self.earlystop_model = earlystop_model.cuda() if earlystop_model else None
@@ -91,6 +92,20 @@ class Disagreement(DataModule):
         """
 
         inds = dataset.train_indices if train else dataset.val_indices
+        if train and not self.combine_val_set:
+            return Subset(dataset, inds)
+
+        if train and disagreement_proportion and self.combine_val_set:
+            val_inds = dataset.val_indices
+            random.shuffle(val_inds)
+            disagreement_num = int(disagreement_proportion * len(val_inds))
+
+            inds = np.concatenate((dataset.train_indices, val_inds[:disagreement_num]))
+            dataset.train_indices = inds
+            dataset.val_indices = val_inds[disagreement_num:]
+            dataset_combined = Subset(dataset, inds)
+
+            return dataset_combined
 
         if disagreement_proportion:
             if float(disagreement_proportion) != 1.:
@@ -134,13 +149,13 @@ class Disagreement(DataModule):
 
     def val_dataloader(self):
         dataloaders = super().val_dataloader()
-        return dataloaders
         #return dataloaders[1:] # remove group 0
+        return dataloaders
 
     def test_dataloader(self):
         dataloaders = super().test_dataloader()
-        return dataloaders
         #return dataloaders[1:] # remove group 0
+        return dataloaders
 
     def disagreement_dataloader(self):
         """Returns DataLoader for the disagreement set."""
@@ -415,7 +430,7 @@ class Disagreement(DataModule):
 
             # Creates disagreement sets in addition to regular train/val split.
             dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
-            self.dataset_train = self._split_dataset(dataset_train)
+            self.dataset_train = self._split_dataset(dataset_train, disagreement_proportion=self.disagreement_proportion)
             self.dataset_val, self.dataset_disagreement = self._split_dataset(
                 dataset_val,
                 disagreement_proportion=self.disagreement_proportion,
