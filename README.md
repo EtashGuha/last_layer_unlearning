@@ -16,3 +16,4 @@ Base code goes in `groundzero`. Experiment code goes in `exps`. Config files go 
 ### TODOs
 Make lazy loading option where self.data is strings (like in FMOW).
 Upgrade to PyTorch 2.0 and Lightning 2.0
+Possible W&B integration
