@@ -74,8 +74,8 @@ def reset_fc_hook(model):
 
 def print_metrics(test_metrics, train_dist_proportion):
     #train_dist_mean_acc = sum([p * group[f"test_acc1/dataloader_idx_{j+1}"] for j, (group, p) in enumerate(zip(test_metrics[1:], train_dist_proportion))])
-    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
-    #worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(test_metrics)]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
+    #worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
+    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(test_metrics)]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
 
     """
     test_dist_mean_acc = test_metrics[0]["test_acc1/dataloader_idx_0"]
@@ -100,7 +100,7 @@ def dfr(
     dfr_epochs,
     class_balancing=True,
     class_weights=[],
-    dropout_prob=None,
+    dropout_prob=0,
     earlystop_weights=None,
     gamma=1,
     reset_fc=False,
@@ -151,19 +151,23 @@ def experiment(args, model_class):
     curr_state = state[args.datamodule][args.seed]
 
     # Sets global parameters.
-    ERM_CLASS_BALANCING = True
+    ERM_CLASS_BALANCING = False
     ERM_CLASS_WEIGHTS = ()
-    CLASS_BALANCING = False
-    COMBINE_VAL_SET_FOR_ERM = True
+    CLASS_BALANCING = True
+    COMBINE_VAL_SET_FOR_ERM = False
 
     CLASS_WEIGHTS = ()
-    NUM_DATAS = [10, 20, 50, 100, 200]
+    #NUM_DATAS = [10, 20, 50, 100, 200]
+    NUM_DATAS = [200]
 
     # Sets search parameters.
     RESET_FC = [False]
-    DFR_EPOCH_NUMS = [5000]
-    #DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2]
-    DFR_LRS = [1e-3]
+    #FULL_DFR_EPOCHS = 100 # Vision
+    #DFR_EPOCH_NUMS = [5000] # Vision
+    #DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2] # Vision
+    FULL_DFR_EPOCHS = 10 # NLP
+    DFR_EPOCH_NUMS = [5000] # NLP
+    DFR_LRS = [1e-5] # NLP
     GAMMA = [1]
     EARLYSTOP_NUMS = [1, 2, 5]
     DROPOUT_PROBS = [0.5, 0.7, 0.9]
@@ -173,22 +177,23 @@ def experiment(args, model_class):
     args.num_classes = num_classes
 
     erm_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]
-    dfn_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]
 
     # Trains ERM model.
     erm_version = erm_state["version"]
     erm_metrics = erm_state["metrics"]
-    if erm_version == -1 or erm_metrics == []:
+    if erm_version == -1: #or erm_metrics == []:
         args.balanced_sampler = ERM_CLASS_BALANCING
         args.combine_val_set = COMBINE_VAL_SET_FOR_ERM
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class)
         args.combine_val_set = False
 
-        erm_state["version"] = model.trainer.logger.version
-        erm_state["metrics"] = [erm_val_metrics, erm_test_metrics]
+        erm_version = model.trainer.logger.version
+        erm_metrics = [erm_val_metrics, erm_test_metrics]
+        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]["version"] = model.trainer.logger.version
+        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]["metrics"] = [erm_val_metrics, erm_test_metrics]
+
         dump_state(state)
         del model
-    return
  
     # Gets last-epoch ERM weights.
     args.weights = get_weights(erm_version, ind=-1)
@@ -204,7 +209,6 @@ def experiment(args, model_class):
         dfr_epochs=None,
         reset_fc=False,
     ):
-
         earlystop_weights = None
         if earlystop_num:
             earlystop_weights = get_weights(erm_version, ind=earlystop_num-1)
@@ -231,17 +235,14 @@ def experiment(args, model_class):
         )
                                 
         if num_data == "all":
-            dfr_state = dfn_state["dfr"]
-            if dfr_type == "orig":
-                dfr_state = dfr_state[True]
-            else:
-                dfr_state = dfr_state[False]
+            orig = True if dfr_type == "orig" else False
+            val = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]["dfr"][orig]["val"]
         else:
-            dfr_state = dfn_state[dfr_type][num_data]
+            val = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["val"]
 
-        worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
-        #worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j}"] for j, group in enumerate(val_metrics)])
-        if worst_wg_val >= dfr_state["val"]:
+        #worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(val_metrics[1:])])
+        worst_wg_val = min([group[f"val_acc1/dataloader_idx_{j}"] for j, group in enumerate(val_metrics)])
+        if worst_wg_val >= val:
             if dfr_epoch_num:
                 params = [dfr_epoch_num, dfr_lr]
             else:
@@ -254,47 +255,58 @@ def experiment(args, model_class):
             if dropout_prob:
                 params.append(dropout_prob)
 
-            dfr_state["val"] = worst_wg_val
-            dfr_state["params"] = params
-            dfr_state["metrics"] = [val_metrics, test_metrics]
-            dump_state(state)
+            if num_data == "all":
+                orig = True if dfr_type == "orig" else False
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]["dfr"][orig]["val"] = worst_wg_val
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]["dfr"][orig]["params"] = params
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]["dfr"][orig]["metrics"] = [val_metrics, test_metrics]
+            else:
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["val"] = worst_wg_val
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["params"] = params
+                curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["metrics"] = [val_metrics, test_metrics]
+
+    #print(f"Group-Balanced Full DFR")
+    #dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=args.lr, reset_fc=True)
+
+    #print(f"Group-Unbalanced Full DFR")
+    #dfr_helper("random", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=args.lr, reset_fc=True)
+    #return
 
     # Does hyperparameter search based on worst group validation error.
     for dfr_lr in DFR_LRS:
-        #print(f"Group-Balanced Full DFR: LR {dfr_lr}")
-        #dfr_helper("orig", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
-
-        print(f"Group-Unbalanced Full DFR: LR {dfr_lr}")
-        dfr_helper("random", "all", dfr_epochs=100, dfr_lr=dfr_lr, reset_fc=True)
-        continue
-
         for reset_fc in RESET_FC:
             for num_data in NUM_DATAS:
                 for dfr_epoch_num in DFR_EPOCH_NUMS:
-                    def dfr_helper2(dfr_type, gamma=None, dropout_prob=None, earlystop_num=None):
-                        return dfr_helper(args, dfr_type, num_data, dfr_lr, dfr_epoch_num=dfr_epoch_num,
+                    def dfr_helper2(dfr_type, gamma=None, dropout_prob=0, earlystop_num=None):
+                        return dfr_helper(dfr_type, num_data, dfr_lr, dfr_epoch_num=dfr_epoch_num,
                                 reset_fc=reset_fc, gamma=gamma, dropout_prob=dropout_prob, earlystop_num=earlystop_num)
 
-                    print(f"Random DFN {num}: Epoch Num {dfr_epoch_num} LR {dfr_lr}")
-                    dfr_helper2("random", num_data)
+                    print(f"Random DFN {num_data}: Epoch Num {dfr_epoch_num} LR {dfr_lr}")
+                    dfr_helper2("random")
 
                     for gamma in GAMMA:
-                        print(f"Misclassification DFN {num}: Gamma {gamma} Epoch Num {dfr_epoch_num} LR {dfr_lr}")
+                        print(f"Misclassification DFN {num_data}: Gamma {gamma} Epoch Num {dfr_epoch_num} LR {dfr_lr}")
                         dfr_helper2("miscls", gamma=gamma)
 
                         for dropout_prob in DROPOUT_PROBS:
-                            print(f"Dropout DFN {num}: Gamma {gamma} Epoch Num {dfr_epoch_num} Dropout {dropout_prob} LR {dfr_lr}")
+                            print(f"Dropout DFN {num_data}: Gamma {gamma} Epoch Num {dfr_epoch_num} Dropout {dropout_prob} LR {dfr_lr}")
                             dfr_helper2("dropout", gamma=gamma, dropout_prob=dropout_prob)
 
                         for earlystop_num in EARLYSTOP_NUMS:
-                            print(f"Early Stop Disagreement DFN {num}: Gamma {gamma} Epoch Num {dfr_epoch_num} Early Stop {earlystop_num} LR {dfr_lr}")
+                            print(f"Early Stop Disagreement DFN {num_data}: Gamma {gamma} Epoch Num {dfr_epoch_num} Early Stop {earlystop_num} LR {dfr_lr}")
                             dfr_helper2("earlystop", gamma=gamma, earlystop_num=earlystop_num)
 
-                            print(f"Early Stop Misclassification DFN {num}: Gamma {gamma} Epoch Num {dfr_epoch_num} Early Stop {earlystop_num} LR {dfr_lr}")
+                            print(f"Early Stop Misclassification DFN {num_data}: Gamma {gamma} Epoch Num {dfr_epoch_num} Early Stop {earlystop_num} LR {dfr_lr}")
                             dfr_helper2("earlystop_miscls", gamma=gamma, earlystop_num=earlystop_num)
 
+    disk_state = load_state()
+    state.update(disk_state)
+    dump_state(state)
+
+    dfn_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS]
 
     print("\n---Hyperparameter Search Results---")
+    """
     print("\nERM:")
     print_metrics(erm_metrics[1], train_dist_proportion)
     print("\nGroup-Balanced Full DFR:")
@@ -303,25 +315,25 @@ def experiment(args, model_class):
     print("\nGroup-Unbalanced Full DFR:")
     print(dfn_state["dfr"][False]["params"])
     print_metrics(dfn_state["dfr"][False]["metrics"][1], train_dist_proportion)
-    return
+    """
 
     for num_data in NUM_DATAS:
-        #print(f"\nGroup-Balanced DFR {num}:")
+        #print(f"\nGroup-Balanced DFN {num_data}:")
         #print(orig[num][CLASS_BALANCING]["params"])
         #print_metrics(orig[num][CLASS_BALANCING]["metrics"][1], train_dist_proportion)
-        print(f"\nRandom DFR {num}:")
+        print(f"\nRandom DFN {num_data}:")
         print(dfn_state["random"][num_data]["params"])
         print_metrics(dfn_state["random"][num_data]["metrics"][1], train_dist_proportion)
-        print(f"\nMisclassification DFR {num}:")
+        print(f"\nMisclassification DFN {num_data}:")
         print(dfn_state["miscls"][num_data]["params"])
         print_metrics(dfn_state["miscls"][num_data]["metrics"][1], train_dist_proportion)
-        print(f"\nDropout DFR {num}:")
+        print(f"\nDropout DFN {num_data}:")
         print(dfn_state["dropout"][num_data]["params"])
         print_metrics(dfn_state["dropout"][num_data]["metrics"][1], train_dist_proportion)
-        print(f"\nEarly Stop Disagreement DFR {num}:")
+        print(f"\nEarly Stop Disagreement DFN {num_data}:")
         print(dfn_state["earlystop"][num_data]["params"])
         print_metrics(dfn_state["earlystop"][num_data]["metrics"][1], train_dist_proportion)
-        print(f"\nEarly Stop Misclassification DFR {num}:")
+        print(f"\nEarly Stop Misclassification DFN {num_data}:")
         print(dfn_state["earlystop_miscls"][num_data]["params"])
         print_metrics(dfn_state["earlystop_miscls"][num_data]["metrics"][1], train_dist_proportion)
 

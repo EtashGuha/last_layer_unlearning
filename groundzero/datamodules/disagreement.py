@@ -149,13 +149,13 @@ class Disagreement(DataModule):
 
     def val_dataloader(self):
         dataloaders = super().val_dataloader()
-        #return dataloaders[1:] # remove group 0
-        return dataloaders
+        return dataloaders[1:] # remove group 0
+        #return dataloaders
 
     def test_dataloader(self):
         dataloaders = super().test_dataloader()
-        #return dataloaders[1:] # remove group 0
-        return dataloaders
+        return dataloaders[1:] # remove group 0
+        #return dataloaders
 
     def disagreement_dataloader(self):
         """Returns DataLoader for the disagreement set."""
