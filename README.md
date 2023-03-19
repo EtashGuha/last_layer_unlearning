@@ -14,4 +14,6 @@ python -m pip install -e .
 Base code goes in `groundzero`. Experiment code goes in `exps`. Config files go in `cfgs`.
 
 ### TODOs
-Make lazy loading option where self.data is strings (like in FMOW).
+1. Make lazy loading option where self.data is strings (like in FMOW).
+2. Upgrade to PyTorch 2.0 and Lightning 2.0
+3. Possible W&B integration
