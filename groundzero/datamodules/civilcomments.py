@@ -2,6 +2,8 @@
 
 # Imports Python packages.
 import numpy as np
+import os.path as osp
+import pickle
 from transformers import BertTokenizer
 import wilds
 
@@ -32,13 +34,38 @@ class CivilCommentsDataset(Dataset):
         spurious_cols = [column_names.index(name) for name in spurious_names]
         spurious = to_np(dataset._metadata_array[:, spurious_cols].sum(-1).clip(max=1))
 
-        self.data = []
-        self.targets = []
-        for d in dataset:
-            self.data.append(d[0])
-            self.targets.append(d[1])
-        self.data = np.asarray(self.data)
-        self.targets = np.asarray(self.targets)
+        data_file = osp.join(self.root, "civilcomments_v1.0", "civilcomments_token_data.pt")
+        targets_file = osp.join(self.root, "civilcomments_v1.0", "civilcomments_token_targets.pt")
+
+        if not osp.isfile(data_file):
+            tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+            def tokenize(text):
+                tokens = tokenizer(
+                    text,
+                    padding="max_length",
+                    truncation=True,
+                    max_length=220,
+                    return_tensors="pt",
+                )
+
+                return torch.squeeze(torch.stack((
+                    tokens["input_ids"], tokens["attention_mask"], 
+                    tokens["token_type_ids"]), dim=2), dim=0)
+
+            data = []
+            targets = []
+            ln = len(dataset)
+            for j, d in enumerate(dataset):
+                print(f"Caching {j}/{ln}")
+                data.append(tokenize(d[0]))
+                targets.append(d[1])
+            data = torch.stack(data)
+            targets = torch.stack(targets)
+            torch.save(data, data_file)
+            torch.save(targets, targets_file)
+
+        self.data = torch.load(data_file).numpy()
+        self.targets = torch.load(targets_file).numpy()
 
         self.groups = [
             np.arange(len(self.targets)),
@@ -63,22 +90,7 @@ class CivilComments(DataModule):
         return None
 
     def default_transforms(self):
-        def BertTokenizeTransform(text):
-            tokenizer=BertTokenizer.from_pretrained("bert-base-uncased")
-
-            tokens = tokenizer(
-                text,
-                padding="max_length",
-                truncation=True,
-                max_length=220,
-                return_tensors="pt",
-            )
-
-            return torch.squeeze(torch.stack((
-                tokens["input_ids"], tokens["attention_mask"], 
-                tokens["token_type_ids"]), dim=2), dim=0)
-
-        return BertTokenizeTransform
+        return None
 
 class CivilCommentsDisagreement(CivilComments, Disagreement):
     """DataModule for the CivilCommentsDisagreement dataset."""

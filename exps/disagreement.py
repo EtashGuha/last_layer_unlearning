@@ -151,14 +151,13 @@ def experiment(args, model_class):
     curr_state = state[args.datamodule][args.seed]
 
     # Sets global parameters.
-    ERM_CLASS_BALANCING = False
+    ERM_CLASS_BALANCING = True
     ERM_CLASS_WEIGHTS = ()
     CLASS_BALANCING = True
     COMBINE_VAL_SET_FOR_ERM = False
 
     CLASS_WEIGHTS = ()
-    #NUM_DATAS = [10, 20, 50, 100, 200]
-    NUM_DATAS = [200]
+    NUM_DATAS = [10, 20, 50, 100, 200, 500]
 
     # Sets search parameters.
     RESET_FC = [False]
@@ -166,8 +165,8 @@ def experiment(args, model_class):
     #DFR_EPOCH_NUMS = [5000] # Vision
     #DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2] # Vision
     FULL_DFR_EPOCHS = 10 # NLP
-    DFR_EPOCH_NUMS = [5000] # NLP
-    DFR_LRS = [1e-5] # NLP
+    DFR_EPOCH_NUMS = [10000] # NLP
+    DFR_LRS = [1e-7, 1e-6, 1e-5, 1e-4] # NLP
     GAMMA = [1]
     EARLYSTOP_NUMS = [1, 2, 5]
     DROPOUT_PROBS = [0.5, 0.7, 0.9]
