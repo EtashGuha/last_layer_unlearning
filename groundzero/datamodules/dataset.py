@@ -39,7 +39,6 @@ class Dataset(VisionDataset):
         transform=None,
         target_transform=None, 
         download=False,
-        group=0,
     ):
         """Initializes a Dataset and downloads to disk if requested.
 
@@ -54,7 +53,6 @@ class Dataset(VisionDataset):
             transform: Composition of torchvision.transforms for the image data.
             target_transform: Composition of torchvision.transforms for the targets.
             download: Whether to download the dataset to disk.
-            group: If the dataset has multiple groups, specifies which one to initialize.
         """
 
         super().__init__(
@@ -64,7 +62,6 @@ class Dataset(VisionDataset):
         )
 
         self.train = train
-        self.group = group
 
         self.data = None
         self.targets = None
@@ -78,16 +75,19 @@ class Dataset(VisionDataset):
 
         self.load_data()
 
-        if self.groups is not None and self.val_indices is not None:
-            self.val_indices = np.intersect1d(self.groups[group], self.val_indices)
-        if self.groups is not None and self.test_indices is not None:
-            self.test_indices = np.intersect1d(self.groups[group], self.test_indices)
-
         if (self.data is not None and self.targets is not None and
                 self.test_indices is not None and not self.train):
             self.data = self.data[self.test_indices]
             self.targets = self.targets[self.test_indices]
-                
+            if self.groups is not None:
+                self.groups = [
+                    np.in1d(self.test_indices, group).nonzero()[0]
+                    for group in self.groups
+                ]
+            self.train_indices = np.array([])
+            self.val_indices = np.array([])
+            self.test_indices = np.arange(len(self.data))
+
     def __len__(self):
         return len(self.data)
 
@@ -123,7 +123,7 @@ class Subset(Dataset):
     """Subset of a Dataset at specified indices.
     
     Modified from torch.utils.Subset to allow interactions as if
-    it was a regular dataset (e.g., by indices, groups, etc.).
+    it was a regular Dataset (e.g., by indices, groups, etc.).
     """
 
     def __init__(self, dataset, indices):
@@ -138,14 +138,14 @@ class Subset(Dataset):
         self.root = dataset.root
         self.transform = dataset.transform
         self.target_transform = dataset.target_transform
+        self.train = dataset.train
+        self.groups = dataset.groups
+
         self.data = dataset.data[indices]
         self.targets = dataset.targets[indices]
-        self.train = dataset.train
         self.train_indices = dataset.train_indices
         self.val_indices = dataset.val_indices
         self.test_indices = dataset.test_indices
-        self.group = dataset.group
-        self.groups = dataset.groups
         
         # Gets subsets of train_indices, etc. that are present in indices and
         # converts them to new indices taking values from 0 to len(indices).
@@ -153,7 +153,7 @@ class Subset(Dataset):
             self.train_indices = np.in1d(indices, self.train_indices).nonzero()[0]
         if self.val_indices is not None:
             self.val_indices = np.in1d(indices, self.val_indices).nonzero()[0]
-        if self.test_indices is not None:
+        if not self.train and self.test_indices is not None:
             self.test_indices = np.in1d(indices, self.test_indices).nonzero()[0]
         if self.groups is not None:
             self.groups = [

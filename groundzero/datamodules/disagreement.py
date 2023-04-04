@@ -51,6 +51,7 @@ class Disagreement(DataModule):
         kl_ablation=None,
         gamma=None,
         class_balancing=False,
+        use_test_set_for_dfn=False,
     ):
         """Initializes a Disagreement DataModule.
         
@@ -71,6 +72,7 @@ class Disagreement(DataModule):
         self.kl_ablation = kl_ablation
         self.class_balancing = class_balancing
         self.gamma = gamma
+        self.use_test_set_for_dfn = use_test_set_for_dfn
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -81,7 +83,7 @@ class Disagreement(DataModule):
         )
         return msg
 
-    def _split_dataset(self, dataset, disagreement_proportion=None, train=True):
+    def _split_dataset(self, dataset, disagreement_proportion=None, use_test_set_for_dfn=False, train=True, split_test_inds = None):
         """Splits dataset into training and validation subsets.
 
         Args:
@@ -91,11 +93,19 @@ class Disagreement(DataModule):
         Returns:
         """
 
-        inds = dataset.train_indices if train else dataset.val_indices
+        if train:
+            inds = dataset.train_indices
+        elif not use_test_set_for_dfn:
+            inds = dataset.val_indices
+        else:
+            inds = split_test_inds
+
         if train and not self.combine_val_set:
             return Subset(dataset, inds)
 
-        if train and disagreement_proportion and self.combine_val_set:
+        if train and disagreement_proportion and self.combine_val_set and not use_test_set_for_dfn:
+            # Not implemented for use_test_set_for_dfn
+
             val_inds = dataset.val_indices
             random.shuffle(val_inds)
             disagreement_num = int(disagreement_proportion * len(val_inds))
@@ -115,8 +125,12 @@ class Disagreement(DataModule):
                 dataset_reg = Subset(dataset, inds[disagreement_num:])
                 dataset_disagreement = Subset(dataset, inds[:disagreement_num])
 
-                dataset_reg.val_indices = inds[disagreement_num:]
-                dataset_disagreement.val_indices = inds[:disagreement_num]
+                if use_test_set_for_dfn:
+                    dataset_reg.test_indices = inds[disagreement_num:]
+                    dataset_disagreement.test_indices = inds[:disagreement_num]
+                else:
+                    dataset_reg.val_indices = inds[disagreement_num:]
+                    dataset_disagreement.val_indices = inds[:disagreement_num]
 
                 return dataset_reg, dataset_disagreement
             else:
@@ -203,18 +217,25 @@ class Disagreement(DataModule):
         dataloader = self.disagreement_dataloader()
         batch_size = dataloader.batch_size
 
-        new_set = self.dataset_class(
-            self.data_dir,
-            train=True,
-            transform=self.train_transforms,
-        )
-
         disagree = []
         disagree_targets = []
         agree = []
         agree_targets = []
 
-        all_inds = dataloader.dataset.val_indices
+        if self.use_test_set_for_dfn:
+            all_inds = dataloader.dataset.test_indices
+            new_set = self.dataset_class(
+                self.data_dir,
+                train=False,
+                transform=self.train_transforms,
+            )
+        else:
+            all_inds = dataloader.dataset.val_indices
+            new_set = self.dataset_class(
+                self.data_dir,
+                train=True,
+                transform=self.train_transforms,
+            )
 
         if self.dfr_type in ("orig", "random"):
             targets = []
@@ -399,7 +420,10 @@ class Disagreement(DataModule):
                 indices = np.asarray(disagree)
 
         # Uses disagreement set as new training set for DFR.
-        new_set.train_indices = new_set.val_indices
+        if self.use_test_set_for_dfn:
+            new_set.train_indices = new_set.test_indices
+        else:
+            new_set.train_indices = new_set.val_indices
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.
@@ -415,39 +439,51 @@ class Disagreement(DataModule):
             stage: The stage of training; either "fit", "test", or None (both).
         """
 
+        dataset_train = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.train_transforms,
+        )
+
+        dataset_val = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.val_transforms,
+        )
+
+        dataset_test = self.dataset_class(
+            self.data_dir,
+            train=False,
+            transform=self.test_transforms,
+        )
+        dataset_test = self.test_preprocess(dataset_test)
+
+        dfn_inds = None
+        if self.use_test_set_for_dfn:
+            inds = dataset_test.test_indices
+            random.shuffle(inds)
+            test_inds = inds[::2]
+            dfn_inds = inds[1::2]
+            dataset_test = Subset(dataset_test, test_inds)
+
+        self.dataset_test = dataset_test
+
+        # Creates disagreement sets in addition to regular train/val split.
+        dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
+        self.dataset_train = self._split_dataset(dataset_train, disagreement_proportion=self.disagreement_proportion)
+        self.dataset_val, self.dataset_disagreement = self._split_dataset(
+            dataset_val,
+            disagreement_proportion=self.disagreement_proportion,
+            use_test_set_for_dfn=self.use_test_set_for_dfn,
+            train=False,
+            split_test_inds=dfn_inds,
+        )
+        
         if stage == "fit" or stage is None:
-            dataset_train = self.dataset_class(
-                self.data_dir,
-                train=True,
-                transform=self.train_transforms,
-            )
-
-            dataset_val = self.dataset_class(
-                self.data_dir,
-                train=True,
-                transform=self.val_transforms,
-            )
-
-            # Creates disagreement sets in addition to regular train/val split.
-            dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
-            self.dataset_train = self._split_dataset(dataset_train, disagreement_proportion=self.disagreement_proportion)
-            self.dataset_val, self.dataset_disagreement = self._split_dataset(
-                dataset_val,
-                disagreement_proportion=self.disagreement_proportion,
-                train=False,
-            )
-
             # Performs disagreement and sets new train dataset.
             if self.model:
                 print("Computing disagreements...")
                 self.disagreement()
                 del self.model
 
-        if stage == "test" or stage is None:
-            dataset_test = self.dataset_class(
-                self.data_dir,
-                train=False,
-                transform=self.test_transforms,
-            )
-            self.dataset_test = self.test_preprocess(dataset_test)
-
+            

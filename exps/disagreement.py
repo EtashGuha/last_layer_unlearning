@@ -55,13 +55,15 @@ def load_state():
         # TODO: Initialize the results dict.
         raise NotImplementedError()
 
-    with open("disagreement.pkl", "rb") as f:
+    #with open("disagreement.pkl", "rb") as f:
+    with open("disagreement2.pkl", "rb") as f:
         state = pickle.load(f)
 
     return state
 
 def dump_state(state):
-    with open("disagreement.pkl", "wb") as f:
+    #with open("disagreement.pkl", "wb") as f:
+    with open("disagreement2.pkl", "wb") as f:
         pickle.dump(state, f)
 
 def reset_fc_hook(model):
@@ -104,6 +106,7 @@ def dfr(
     earlystop_weights=None,
     gamma=1,
     reset_fc=False,
+    use_test_set_for_dfn=False,
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dfr_type = dfr_type
@@ -136,6 +139,7 @@ def dfr(
                     num_data=num_data,
                     gamma=gamma,
                     class_balancing=class_balancing,
+                    use_test_set_for_dfn=use_test_set_for_dfn,
                 )
 
         return Disagreement
@@ -155,18 +159,19 @@ def experiment(args, model_class):
     ERM_CLASS_WEIGHTS = ()
     CLASS_BALANCING = True
     COMBINE_VAL_SET_FOR_ERM = False
+    USE_TEST_SET_FOR_DFN = True #TODO: Integrate this option into the pkl.
 
     CLASS_WEIGHTS = ()
     NUM_DATAS = [10, 20, 50, 100, 200, 500]
 
     # Sets search parameters.
     RESET_FC = [False]
-    #FULL_DFR_EPOCHS = 100 # Vision
-    #DFR_EPOCH_NUMS = [5000] # Vision
-    #DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2] # Vision
-    FULL_DFR_EPOCHS = 10 # NLP
-    DFR_EPOCH_NUMS = [10000] # NLP
-    DFR_LRS = [1e-7, 1e-6, 1e-5, 1e-4] # NLP
+    FULL_DFR_EPOCHS = 100 # Vision
+    DFR_EPOCH_NUMS = [5000] # Vision
+    DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2] # Vision
+    #FULL_DFR_EPOCHS = 10 # NLP
+    #DFR_EPOCH_NUMS = [10000] # NLP
+    #DFR_LRS = [1e-7, 1e-6, 1e-5, 1e-4] # NLP
     GAMMA = [1]
     EARLYSTOP_NUMS = [1, 2, 5]
     DROPOUT_PROBS = [0.5, 0.7, 0.9]
@@ -227,6 +232,7 @@ def experiment(args, model_class):
             dfr_epochs,
             class_balancing=CLASS_BALANCING,
             class_weights=CLASS_WEIGHTS,
+            use_test_set_for_dfn=USE_TEST_SET_FOR_DFN,
             dropout_prob=dropout_prob,
             earlystop_weights=earlystop_weights,
             gamma=gamma,

@@ -2,6 +2,7 @@
 
 # Imports Python builtins.
 from abc import abstractmethod
+from copy import deepcopy
 import random
 
 # Imports Python packages.
@@ -238,21 +239,9 @@ class DataModule(VisionDataModule):
 
         if hasattr(self.dataset_val, "groups") and len(self.dataset_val.groups):
             # Returns a list of DataLoaders for each group/split.
-            # TODO: Breaks if self.dataset_val is a Subset?
             dataloaders = []
-            for group in range(len(self.dataset_val.groups)):
-                dataloaders.append(
-                    self._data_loader(
-                        self._split_dataset(
-                            self.dataset_class(
-                                self.data_dir,
-                                train=True,
-                                transform=self.default_transforms(),
-                                group=group,
-                            ),
-                            train=False,
-                )))
-
+            for group in self.dataset_val.groups:
+                dataloaders.append(self._data_loader(Subset(self.dataset_val, group)))
             return dataloaders
         return self._data_loader(self.dataset_val)
 
@@ -261,18 +250,9 @@ class DataModule(VisionDataModule):
 
         if hasattr(self.dataset_test, "groups") and len(self.dataset_test.groups):
             # Returns a list of DataLoaders for each group/split.
-            # TODO: Breaks if self.dataset_test is a Subset?
             dataloaders = []
-            for group in range(len(self.dataset_test.groups)):
-                dataloaders.append(
-                    self._data_loader(
-                        self.dataset_class(
-                            self.data_dir,
-                            train=False,
-                            transform=self.default_transforms(),
-                            group=group,
-                )))
-
+            for group in self.dataset_test.groups:
+                dataloaders.append(self._data_loader(Subset(self.dataset_test, group)))
             return dataloaders
         return self._data_loader(self.dataset_test)
 
