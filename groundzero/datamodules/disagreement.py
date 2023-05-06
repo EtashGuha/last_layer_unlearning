@@ -142,6 +142,7 @@ class Disagreement(DataModule):
         """Returns DataLoader for the train dataset (after disagreement)."""
 
         if self.dfr_type == "orig":
+            """
             # Does group balancing for original DFR.
             indices = self.dataset_train.train_indices
             groups = np.zeros(len(indices), dtype=np.int32)
@@ -155,6 +156,82 @@ class Disagreement(DataModule):
             weights = label_weights[groups]
             sampler = WeightedRandomSampler(weights, len(weights))
             return self._data_loader(self.dataset_train, sampler=sampler)
+            """
+
+            # For group-balancing ablation
+            dataset = "Waterbirds"
+            normalized_group_ratio = 0.75
+
+            # Sets the minority groups (zero-indexed).
+            min_group_nums = {
+                "Waterbirds": np.array([2, 3]),
+                "CelebA": np.array([3]),
+                "CivilComments": np.array([]),
+                "MultiNLI": np.array([]),
+            }
+
+            min_groups = min_group_nums[dataset]
+            totals = np.array([len(x) for x in self.dataset_train.groups[1:]])
+            num_groups = len(totals)
+            num_min_groups = len(min_groups)
+            num_maj_groups = num_groups - num_min_groups
+            ratio = normalized_group_ratio / num_groups
+
+            avg_min_size = sum(totals[min_groups]) / num_min_groups
+            total_data = int(num_groups * avg_min_size)
+            total_min = int(avg_min_size * num_groups * num_min_groups * ratio)
+            min_factor_per_group = total_min / sum(totals[min_groups])
+
+            running_mins = 0
+            for j, _ in enumerate(totals):
+                if j in min_groups:
+                    new = int(totals[j] * min_factor_per_group)
+                    removed = totals[j] - new
+                    totals[j] = new
+                    running_mins += new
+
+            total_maj = total_data - running_mins
+            maj_per_group = total_maj // num_maj_groups
+            for j, _ in enumerate(totals):
+                if j not in min_groups:
+                    totals[j] = maj_per_group
+
+            indices = self.dataset_train.train_indices
+            new_indices = []
+            nums = [0] * num_groups
+            
+            # Selects data so that the desired amount of majority
+            # and minority group data is achieved.
+            for x in indices:
+                for j, group in enumerate(self.dataset_train.groups[1:]):
+                    if x in group and nums[j] < totals[j]:
+                        new_indices.append(x) 
+                        nums[j] += 1
+                        break
+            print(nums)
+
+            new_indices = np.array(new_indices)
+            self.dataset_train = Subset(self.dataset_train, new_indices)
+            return super().train_dataloader()
+
+            """
+            # FMOW
+            indices = self.dataset_train.train_indices
+            random.shuffle(indices)
+            random.shuffle(indices)
+            nums = [0, 0, 0, 0, 0]
+            new_indices = []
+            for x in indices:
+                for j, group in enumerate(self.dataset_train.groups[1:]):
+                    if x in group and nums[j] < 339:
+                        new_indices.append(x)
+                        nums[j] += 1
+            print(nums)
+            new_indices = np.array(new_indices)
+            self.dataset_train = Subset(self.dataset_train, new_indices)
+            return super().train_dataloader()
+            """
+
         elif self.class_balancing:
             self.balanced_sampler = True
             return super().train_dataloader()

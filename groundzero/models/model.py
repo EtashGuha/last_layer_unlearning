@@ -170,7 +170,7 @@ class Model(pl.LightningModule):
             
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(
+        acc1, acc1_by_class, acc5, acc5_by_class = compute_accuracy(
             result["probs"],
             result["targets"],
             self.hparams.num_classes,
@@ -181,13 +181,16 @@ class Model(pl.LightningModule):
         if dataloader_idx == 0:
             self.log_helper("train_loss", result["loss"], on_step=True, add_dataloader_idx=False)
             self.log_helper("train_acc1", acc1, on_step=True, add_dataloader_idx=False)
+            self.log_helper("train_acc5", acc5, on_step=True, add_dataloader_idx=False)
+            self.log_helper("train_worst_class_acc1", min(acc1_by_class), on_step=True, add_dataloader_idx=False)
         try:
             # Errors if there is only 1 dataloader -- this means we
             # already logged it, so just pass.
             self.log_helper("train_acc1", acc1, on_step=True)
+            self.log_helper("train_acc5", acc5, on_step=True)
+            self.log_helper("train_worst_class_acc1", min(acc1_by_class), on_step=True)
         except:
             pass
-        self.log_helper("train_acc5", acc5, on_step=True)
 
         return result
 
@@ -219,7 +222,7 @@ class Model(pl.LightningModule):
 
         result = self.step(batch, idx)
 
-        acc1, acc5 = compute_accuracy(
+        acc1, acc1_by_class, acc5, acc5_by_class = compute_accuracy(
             result["probs"],
             result["targets"],
             self.hparams.num_classes,
@@ -230,13 +233,16 @@ class Model(pl.LightningModule):
         if dataloader_idx == 0:
             self.log_helper("val_loss", result["loss"], add_dataloader_idx=False)
             self.log_helper("val_acc1", acc1, add_dataloader_idx=False)
+            self.log_helper("val_acc5", acc5, add_dataloader_idx=False)
+            self.log_helper("val_worst_class_acc1", min(acc1_by_class), on_step=True, add_dataloader_idx=False)
         try:
             # Errors if there is only 1 dataloader -- this means we
             # already logged it, so just pass.
             self.log_helper("val_acc1", acc1)
+            self.log_helper("val_acc5", acc5)
+            self.log_helper("val_worst_class_acc1", min(acc1_by_class), on_step=True)
         except:
             pass
-        self.log_helper("val_acc5", acc5)
 
         return result
 
@@ -255,7 +261,7 @@ class Model(pl.LightningModule):
         self.val_acc1 = torch.stack(val_acc1).mean().item()
 
     def test_step(self, batch, idx, dataloader_idx=0):
-        """Performs a single validation step.
+        """Performs a single test step.
 
         Args:
             batch: A tuple containing the inputs and targets as torch.tensor.
@@ -269,7 +275,7 @@ class Model(pl.LightningModule):
         result = self.step(batch, idx)
 
         # Logs losses and accuracies.
-        acc1, acc5 = compute_accuracy(
+        acc1, acc1_by_class, acc5, acc5_by_class = compute_accuracy(
             result["probs"],
             result["targets"],
             self.hparams.num_classes,
@@ -277,6 +283,7 @@ class Model(pl.LightningModule):
         self.log_helper("test_loss", result["loss"])
         self.log_helper("test_acc1", acc1)
         self.log_helper("test_acc5", acc5)
+        self.log_helper("test_worst_class_acc1", min(acc1_by_class))
 
         return result
 

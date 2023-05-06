@@ -155,24 +155,26 @@ def experiment(args, model_class):
     curr_state = state[args.datamodule][args.seed]
 
     # Sets global parameters.
-    ERM_CLASS_BALANCING = True
+    ERM_CLASS_BALANCING = False
     ERM_CLASS_WEIGHTS = ()
-    CLASS_BALANCING = True
+    CLASS_BALANCING = False
     COMBINE_VAL_SET_FOR_ERM = False
-    USE_TEST_SET_FOR_DFN = True #TODO: Integrate this option into the pkl.
+    USE_TEST_SET_FOR_DFN = False #TODO: Can be removed
 
-    CLASS_WEIGHTS = ()
+    CLASS_WEIGHTS = () # TODO: Can be removed
     NUM_DATAS = [10, 20, 50, 100, 200, 500]
 
     # Sets search parameters.
     RESET_FC = [False]
+    FULL_DFR_LR = 3e-3 # Vision
     FULL_DFR_EPOCHS = 100 # Vision
     DFR_EPOCH_NUMS = [5000] # Vision
     DFR_LRS = [1e-5, 1e-4, 1e-3, 1e-2] # Vision
+    #FULL_DFR_LR = 1e-5 # NLP
     #FULL_DFR_EPOCHS = 10 # NLP
     #DFR_EPOCH_NUMS = [10000] # NLP
     #DFR_LRS = [1e-7, 1e-6, 1e-5, 1e-4] # NLP
-    GAMMA = [1]
+    GAMMA = [1] # TODO: Can be removed
     EARLYSTOP_NUMS = [1, 2, 5]
     DROPOUT_PROBS = [0.5, 0.7, 0.9]
     
@@ -270,12 +272,13 @@ def experiment(args, model_class):
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["params"] = params
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["metrics"] = [val_metrics, test_metrics]
 
-    #print(f"Group-Balanced Full DFR")
-    #dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=args.lr, reset_fc=True)
+    print(f"Group-Balanced Full DFR")
+    dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True)
+    return
 
-    #print(f"Group-Unbalanced Full DFR")
-    #dfr_helper("random", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=args.lr, reset_fc=True)
-    #return
+    print(f"Group-Unbalanced Full DFR")
+    dfr_helper("random", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True)
+    return
 
     # Does hyperparameter search based on worst group validation error.
     for dfr_lr in DFR_LRS:

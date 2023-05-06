@@ -16,27 +16,37 @@ def compute_accuracy(probs, targets, num_classes):
         num_classes: The total number of classes.
 
     Returns:
-        The top-1 and top-5 accuracies of probs on targets, as torch.Tensors.
+        The top-1, top-1 by class, top-5, and top-5 by class accuracies of probs on targets.
     """
 
     # TODO: Support targets not indexed by range(num_classes).
 
     if num_classes == 1:
         preds1 = (probs >= 0.5).int()
-        acc1 = (preds1 == targets).float().mean()
     else:
         preds1 = torch.argmax(probs, dim=1)
-        acc1 = (preds1 == targets).float().mean()
 
-    acc5 = 1.0
-    if num_classes >= 5:
+    correct = preds1 == targets
+    acc1 = correct.float().mean()
+
+    acc1_by_class = []
+    for j in range(num_classes):
+        acc1_by_class.append(correct[targets == j].float().mean())
+    acc1_by_class = torch.stack(acc1_by_class)
+
+    acc5 = torch.tensor(1.)
+    acc5_by_class = torch.tensor([1. for _ in range(num_classes)])
+    if num_classes > 5:
         _, preds5 = torch.topk(probs, k=5, dim=1)
-        acc5 = torch.tensor(
-            [t in preds5[j] for j, t in enumerate(targets)],
-            dtype=torch.float64,
-        ).mean()
+        correct = torch.tensor([t in preds5[j] for j, t in enumerate(targets)])
+        acc5 = correct.float().mean()
 
-    return acc1, acc5
+        acc5_by_class = []
+        for j in range(num_classes):
+            acc5_by_class.append(correct[targets == j].float().mean())
+        acc5_by_class = torch.stack(acc5_by_class)
+
+    return acc1, acc1_by_class, acc5, acc5_by_class
 
 def _to_np(x):
     return x.cpu().detach().numpy()
