@@ -52,6 +52,7 @@ class Disagreement(DataModule):
         gamma=None,
         class_balancing=False,
         use_test_set_for_dfn=False,
+        pct_minority=100,
     ):
         """Initializes a Disagreement DataModule.
         
@@ -73,6 +74,7 @@ class Disagreement(DataModule):
         self.class_balancing = class_balancing
         self.gamma = gamma
         self.use_test_set_for_dfn = use_test_set_for_dfn
+        self.pct_minority = pct_minority
 
     def load_msg(self):
         """Returns a descriptive message about the DataModule configuration."""
@@ -158,43 +160,56 @@ class Disagreement(DataModule):
             return self._data_loader(self.dataset_train, sampler=sampler)
             """
 
-            # For group-balancing ablation
-            dataset = "Waterbirds"
-            normalized_group_ratio = 0.75
+            CLASS_BALANCED = False
 
             # Sets the minority groups (zero-indexed).
             min_group_nums = {
-                "Waterbirds": np.array([2, 3]),
+                "Waterbirds": np.array([1, 2]),
                 "CelebA": np.array([3]),
-                "CivilComments": np.array([]),
-                "MultiNLI": np.array([]),
+                "CivilComments": np.array([1, 2]),
+                "MultiNLI": np.array([1, 3, 5]),
             }
 
+            dataset = self.__class__.__bases__[0].__name__[:-12]
             min_groups = min_group_nums[dataset]
             totals = np.array([len(x) for x in self.dataset_train.groups[1:]])
             num_groups = len(totals)
             num_min_groups = len(min_groups)
             num_maj_groups = num_groups - num_min_groups
-            ratio = normalized_group_ratio / num_groups
 
-            avg_min_size = sum(totals[min_groups]) / num_min_groups
-            total_data = int(num_groups * avg_min_size)
-            total_min = int(avg_min_size * num_groups * num_min_groups * ratio)
-            min_factor_per_group = total_min / sum(totals[min_groups])
+            smallest_min_group = min([t for j, t in enumerate(totals)
+                                      if j in min_groups])
+            smallest_maj_group = min([t for j, t in enumerate(totals)
+                                      if j not in min_groups])
 
-            running_mins = 0
+            downsample_num = (smallest_maj_group * num_maj_groups) / num_groups
+            downsample_num = min(int(downsample_num), smallest_min_group)
+
+            if CLASS_BALANCED or dataset in ("Waterbirds", "MultiNLI"):
+                # Waterbirds and MultiNLI are already class-balanced
+                totals = [downsample_num] * num_groups
+            else:
+                # Only for CelebA and CivilComments
+                maj_ratio = sum(totals[:2]) / sum(totals)
+                maj = int(-(maj_ratio * downsample_num) / (maj_ratio - 1))
+                totals = [maj, maj, downsample_num, downsample_num]
+
+            ratio = self.pct_minority / 100
+
+            removed = 0
             for j, _ in enumerate(totals):
                 if j in min_groups:
-                    new = int(totals[j] * min_factor_per_group)
-                    removed = totals[j] - new
+                    new = int(totals[j] * ratio)
+                    removed += totals[j] - new
                     totals[j] = new
-                    running_mins += new
 
-            total_maj = total_data - running_mins
-            maj_per_group = total_maj // num_maj_groups
-            for j, _ in enumerate(totals):
-                if j not in min_groups:
-                    totals[j] = maj_per_group
+            if dataset == "CelebA":
+                totals[2] += removed
+            else:
+                maj_per_group = removed // num_maj_groups
+                for j, t in enumerate(totals):
+                    if j not in min_groups:
+                        totals[j] += maj_per_group
 
             indices = self.dataset_train.train_indices
             new_indices = []
@@ -212,6 +227,8 @@ class Disagreement(DataModule):
 
             new_indices = np.array(new_indices)
             self.dataset_train = Subset(self.dataset_train, new_indices)
+            #if CLASS_BALANCED: #for celeba mainly
+                #self.balanced_sampler = True
             return super().train_dataloader()
 
             """

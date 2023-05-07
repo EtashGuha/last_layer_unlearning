@@ -107,6 +107,7 @@ def dfr(
     gamma=1,
     reset_fc=False,
     use_test_set_for_dfn=False,
+    pct_minority=100,
 ):
     disagreement_args = deepcopy(args)
     disagreement_args.dfr_type = dfr_type
@@ -140,6 +141,7 @@ def dfr(
                     gamma=gamma,
                     class_balancing=class_balancing,
                     use_test_set_for_dfn=use_test_set_for_dfn,
+                    pct_minority=pct_minority,
                 )
 
         return Disagreement
@@ -156,7 +158,7 @@ def experiment(args, model_class):
 
     # Sets global parameters.
     ERM_CLASS_BALANCING = False
-    ERM_CLASS_WEIGHTS = ()
+    ERM_CLASS_WEIGHTS = () #TODO: Can be removed
     CLASS_BALANCING = False
     COMBINE_VAL_SET_FOR_ERM = False
     USE_TEST_SET_FOR_DFN = False #TODO: Can be removed
@@ -214,6 +216,7 @@ def experiment(args, model_class):
         dfr_epoch_num=None,
         dfr_epochs=None,
         reset_fc=False,
+        pct_minority=100,
     ):
         earlystop_weights = None
         if earlystop_num:
@@ -239,6 +242,7 @@ def experiment(args, model_class):
             earlystop_weights=earlystop_weights,
             gamma=gamma,
             reset_fc=reset_fc,
+            pct_minority=pct_minority,
         )
                                 
         if num_data == "all":
@@ -272,8 +276,10 @@ def experiment(args, model_class):
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["params"] = params
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["metrics"] = [val_metrics, test_metrics]
 
-    print(f"Group-Balanced Full DFR")
-    dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True)
+    for pct_minority in [2.5, 5, 12.5, 25, 37.5, 50, 62.5, 75, 82.5, 100]:
+        print(f"Group-Balanced Full DFR")
+        print(pct_minority)
+        dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True, pct_minority=pct_minority)
     return
 
     print(f"Group-Unbalanced Full DFR")

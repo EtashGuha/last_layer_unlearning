@@ -65,8 +65,8 @@ class WaterbirdsDataset(Dataset):
             np.arange(len(self.targets)),
             np.intersect1d(landbirds, land),
             np.intersect1d(landbirds, water),
-            np.intersect1d(waterbirds, water),
             np.intersect1d(waterbirds, land),
+            np.intersect1d(waterbirds, water),
         ]
         
         split = np.asarray(metadata_df["split"].values)

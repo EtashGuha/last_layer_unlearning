@@ -104,7 +104,7 @@ class MultiNLIDataset(Dataset):
         self.train_indices = np.argwhere(split == 0).flatten()
         self.val_indices = np.argwhere(split == 1).flatten()
         self.test_indices = np.argwhere(split == 2).flatten()
-    
+
 class MultiNLI(DataModule):
     """DataModule for the MultiNLI dataset."""
 
