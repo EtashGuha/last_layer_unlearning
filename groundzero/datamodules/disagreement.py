@@ -113,7 +113,7 @@ class Disagreement(DataModule):
 
                 disagreement_num = int(self.disagreement_proportion * len(val_inds))
                 train_num = int((len(train_inds) + disagreement_num) * self.combine_val_set_pct / 100)
-                new_dis_num = len(inds) - disagreement_num
+                new_dis_num = len(inds) - int((1 - self.disagreement_proportion) * len(val_inds))
 
                 dataset_t = Subset(dataset_train, inds[:train_num])
                 dataset_d = Subset(dataset_val, inds[train_num:new_dis_num])
@@ -329,7 +329,7 @@ class Disagreement(DataModule):
         agree_targets = []
 
         all_inds = dataloader.dataset.val_indices
-        print(len(all_inds))
+
         new_set = self.dataset_class(
             self.data_dir,
             train=True,
@@ -519,7 +519,7 @@ class Disagreement(DataModule):
                 indices = np.asarray(disagree)
 
         # Uses disagreement set as new training set for DFR.
-        new_set.train_indices = new_set.val_indices # REMEMBER TO UNCOMMENT, ONLY FOR WATERBIRDS ERM SPLIT ABLATION
+        new_set.train_indices = np.concatenate((new_set.train_indices, new_set.val_indices))
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.

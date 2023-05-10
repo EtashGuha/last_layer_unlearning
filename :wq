@@ -115,7 +115,7 @@ def dfr(
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
     finetune_args.check_val_every_n_epoch = dfr_epochs + 1 # change to dfr_epochs to save model
-    finetune_args.ckpt_every_n_epoch = dfr_epochs + 1 # change to dfr_epochs to save model
+    finetune_args.ckpt_every_n_epochs = dfr_epochs + 1 # change to dfr_epochs to save model
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
     finetune_args.lr = dfr_lr
@@ -157,10 +157,8 @@ def experiment(args, model_class):
     # Sets global parameters.
     ERM_CLASS_BALANCING = True
     ERM_CLASS_WEIGHTS = () #TODO: Can be removed
-    CLASS_BALANCING = True
-
-    # make this either False or a whole number
-    COMBINE_VAL_SET_PCT = 85
+    CLASS_BALANCING = False
+    COMBINE_VAL_SET_PCT = 0.8
 
     CLASS_WEIGHTS = () # TODO: Can be removed
     NUM_DATAS = [10, 20, 50, 100, 200, 500]
@@ -200,11 +198,9 @@ def experiment(args, model_class):
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["version"] = model.trainer.logger.version
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["metrics"] = [erm_val_metrics, erm_test_metrics]
 
-        # doesn't work correctly if running multiple ERMs
-        # since they overwrite each other
-        # may have to enter versions manually or fix somehow
         dump_state(state)
         del model
+    return
  
     # Gets last-epoch ERM weights.
     args.weights = get_weights(erm_version, ind=-1)
@@ -278,13 +274,12 @@ def experiment(args, model_class):
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["params"] = params
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["metrics"] = [val_metrics, test_metrics]
 
-    """
-    for pct_minority in [2.5, 5, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100]:
+    #for pct_minority in [2.5, 5, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100]:
+    for pct_minority in [12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100]:
         print(f"Group-Balanced Full DFR")
         print(pct_minority)
         dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True, pct_minority=pct_minority)
     return
-    """
 
     print(f"Group-Unbalanced Full DFR")
     dfr_helper("random", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True)
