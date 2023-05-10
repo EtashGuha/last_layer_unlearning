@@ -106,7 +106,6 @@ def dfr(
     earlystop_weights=None,
     gamma=1,
     reset_fc=False,
-    use_test_set_for_dfn=False,
     pct_minority=100,
 ):
     disagreement_args = deepcopy(args)
@@ -116,7 +115,7 @@ def dfr(
     finetune_args = deepcopy(args)
     finetune_args.train_fc_only = True
     finetune_args.check_val_every_n_epoch = dfr_epochs + 1 # change to dfr_epochs to save model
-    finetune_args.ckpt_every_n_epochs = dfr_epochs + 1 # change to dfr_epochs to save model
+    finetune_args.ckpt_every_n_epoch = dfr_epochs + 1 # change to dfr_epochs to save model
     finetune_args.max_epochs = dfr_epochs
     finetune_args.class_weights = class_weights
     finetune_args.lr = dfr_lr
@@ -140,7 +139,6 @@ def dfr(
                     num_data=num_data,
                     gamma=gamma,
                     class_balancing=class_balancing,
-                    use_test_set_for_dfn=use_test_set_for_dfn,
                     pct_minority=pct_minority,
                 )
 
@@ -157,11 +155,12 @@ def experiment(args, model_class):
     curr_state = state[args.datamodule][args.seed]
 
     # Sets global parameters.
-    ERM_CLASS_BALANCING = False
+    ERM_CLASS_BALANCING = True
     ERM_CLASS_WEIGHTS = () #TODO: Can be removed
-    CLASS_BALANCING = False
-    COMBINE_VAL_SET_FOR_ERM = False
-    USE_TEST_SET_FOR_DFN = False #TODO: Can be removed
+    CLASS_BALANCING = True
+
+    # make this either False or a whole number
+    COMBINE_VAL_SET_PCT = 80
 
     CLASS_WEIGHTS = () # TODO: Can be removed
     NUM_DATAS = [10, 20, 50, 100, 200, 500]
@@ -183,23 +182,28 @@ def experiment(args, model_class):
     # Sets datamodule parameters.
     datamodule_class, num_classes, train_dist_proportion = get_datamodule_parameters(args.datamodule)
     args.num_classes = num_classes
+    args.combine_val_set_pct = COMBINE_VAL_SET_PCT
 
-    erm_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]
+    if COMBINE_VAL_SET_PCT not in curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"]:
+        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT] = {"version": -1, "metrics": []}
+    erm_state = curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]
 
     # Trains ERM model.
     erm_version = erm_state["version"]
     erm_metrics = erm_state["metrics"]
-    if erm_version == -1: #or erm_metrics == []:
+    #if erm_version == -1: #or erm_metrics == []:
+    if True:
         args.balanced_sampler = ERM_CLASS_BALANCING
-        args.combine_val_set = COMBINE_VAL_SET_FOR_ERM
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class)
-        args.combine_val_set = False
 
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
-        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]["version"] = model.trainer.logger.version
-        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_FOR_ERM]["metrics"] = [erm_val_metrics, erm_test_metrics]
+        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["version"] = model.trainer.logger.version
+        curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["metrics"] = [erm_val_metrics, erm_test_metrics]
 
+        # doesn't work correctly if running multiple ERMs
+        # since they overwrite each other
+        # may have to enter versions manually or fix somehow
         dump_state(state)
         del model
  
@@ -237,7 +241,6 @@ def experiment(args, model_class):
             dfr_epochs,
             class_balancing=CLASS_BALANCING,
             class_weights=CLASS_WEIGHTS,
-            use_test_set_for_dfn=USE_TEST_SET_FOR_DFN,
             dropout_prob=dropout_prob,
             earlystop_weights=earlystop_weights,
             gamma=gamma,
@@ -276,11 +279,13 @@ def experiment(args, model_class):
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["params"] = params
                 curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["dfn"][CLASS_BALANCING][CLASS_WEIGHTS][dfr_type][num_data]["metrics"] = [val_metrics, test_metrics]
 
-    for pct_minority in [2.5, 5, 12.5, 25, 37.5, 50, 62.5, 75, 82.5, 100]:
+    """
+    for pct_minority in [2.5, 5, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100]:
         print(f"Group-Balanced Full DFR")
         print(pct_minority)
         dfr_helper("orig", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True, pct_minority=pct_minority)
     return
+    """
 
     print(f"Group-Unbalanced Full DFR")
     dfr_helper("random", "all", dfr_epochs=FULL_DFR_EPOCHS, dfr_lr=FULL_DFR_LR, reset_fc=True)

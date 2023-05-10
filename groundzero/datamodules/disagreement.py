@@ -51,7 +51,6 @@ class Disagreement(DataModule):
         kl_ablation=None,
         gamma=None,
         class_balancing=False,
-        use_test_set_for_dfn=False,
         pct_minority=100,
     ):
         """Initializes a Disagreement DataModule.
@@ -66,14 +65,13 @@ class Disagreement(DataModule):
         
         self.disagreement_proportion = 0.5
         self.dfr_type = args.dfr_type if hasattr(args, "dfr_type") else None
-        self.combine_val_set = args.combine_val_set if hasattr(args, "combine_val_set") else False
+        self.combine_val_set_pct = args.combine_val_set_pct if hasattr(args, "combine_val_set_pct") else False
         self.num_data = num_data
         self.model = model.cuda() if model else None
         self.earlystop_model = earlystop_model.cuda() if earlystop_model else None
         self.kl_ablation = kl_ablation
         self.class_balancing = class_balancing
         self.gamma = gamma
-        self.use_test_set_for_dfn = use_test_set_for_dfn
         self.pct_minority = pct_minority
 
     def load_msg(self):
@@ -85,60 +83,59 @@ class Disagreement(DataModule):
         )
         return msg
 
-    def _split_dataset(self, dataset, disagreement_proportion=None, use_test_set_for_dfn=False, train=True, split_test_inds = None):
+    def _split_dataset(self, dataset_train, dataset_val):
         """Splits dataset into training and validation subsets.
 
         Args:
             dataset: A groundzero.datamodules.Dataset.
-            disagreement_proportion: The proportion of the dataset for disagreement.
 
         Returns:
         """
 
-        if train:
-            inds = dataset.train_indices
-        elif not use_test_set_for_dfn:
-            inds = dataset.val_indices
-        else:
-            inds = split_test_inds
+        if self.combine_val_set_pct:
+            train_inds = dataset_train.train_indices
+            val_inds = dataset_val.val_indices
 
-        if train and not self.combine_val_set:
-            return Subset(dataset, inds)
+            if len(train_inds) == 4795: #Waterbirds hack
+                random.shuffle(train_inds)
+                train_num = int(len(train_inds) * self.combine_val_set_pct / 100)
 
-        if train and disagreement_proportion and self.combine_val_set and not use_test_set_for_dfn:
-            # Not implemented for use_test_set_for_dfn
+                dataset_t = Subset(dataset_train, train_inds[:train_num])
+                dataset_d = Subset(dataset_val, train_inds[train_num:])
+                dataset_v = Subset(dataset_val, val_inds)
 
-            val_inds = dataset.val_indices
-            random.shuffle(val_inds)
-            disagreement_num = int(disagreement_proportion * len(val_inds))
-
-            inds = np.concatenate((dataset.train_indices, val_inds[:disagreement_num]))
-            dataset.train_indices = inds
-            dataset.val_indices = val_inds[disagreement_num:]
-            dataset_combined = Subset(dataset, inds)
-
-            return dataset_combined
-
-        if disagreement_proportion:
-            if float(disagreement_proportion) != 1.:
-                random.shuffle(inds)
-                disagreement_num = int(disagreement_proportion * len(inds))
-
-                dataset_reg = Subset(dataset, inds[disagreement_num:])
-                dataset_disagreement = Subset(dataset, inds[:disagreement_num])
-
-                if use_test_set_for_dfn:
-                    dataset_reg.test_indices = inds[disagreement_num:]
-                    dataset_disagreement.test_indices = inds[:disagreement_num]
-                else:
-                    dataset_reg.val_indices = inds[disagreement_num:]
-                    dataset_disagreement.val_indices = inds[:disagreement_num]
-
-                return dataset_reg, dataset_disagreement
+                dataset_d.val_indices = train_inds[train_num:]
+                dataset_v.val_indices = val_inds
             else:
-                return Subset(dataset, inds), Subset(dataset, inds)
-        else:
-            return Subset(dataset, inds)
+                random.shuffle(val_inds)
+
+                inds = np.concatenate((train_inds, val_inds))
+
+                disagreement_num = int(self.disagreement_proportion * len(val_inds))
+                train_num = int((len(train_inds) + disagreement_num) * self.combine_val_set_pct / 100)
+                new_dis_num = len(inds) - disagreement_num
+
+                dataset_t = Subset(dataset_train, inds[:train_num])
+                dataset_d = Subset(dataset_val, inds[train_num:new_dis_num])
+                dataset_v = Subset(dataset_val, inds[new_dis_num:])
+
+                dataset_d.val_indices = inds[train_num:new_dis_num]
+                dataset_v.val_indices = inds[new_dis_num:]
+
+            return dataset_t, dataset_d, dataset_v
+
+        inds = dataset_val.val_indices
+        random.shuffle(inds)
+        disagreement_num = int(self.disagreement_proportion * len(inds))
+
+        dataset_t = Subset(dataset_train, dataset_train.train_indices)
+        dataset_d = Subset(dataset_val, inds[:disagreement_num])
+        dataset_v = Subset(dataset_val, inds[disagreement_num:])
+
+        dataset_d.val_indices = inds[:disagreement_num]
+        dataset_v.val_indices = inds[disagreement_num:]
+
+        return dataset_t, dataset_d, dataset_v
 
     def train_dataloader(self):
         """Returns DataLoader for the train dataset (after disagreement)."""
@@ -160,30 +157,68 @@ class Disagreement(DataModule):
             return self._data_loader(self.dataset_train, sampler=sampler)
             """
 
-            CLASS_BALANCED = False
+            CLASS_BALANCED = True
 
             # Sets the minority groups (zero-indexed).
             min_group_nums = {
                 "Waterbirds": np.array([1, 2]),
                 "CelebA": np.array([3]),
-                "CivilComments": np.array([1, 2]),
-                "MultiNLI": np.array([1, 3, 5]),
+                "CivilComments": np.array([3]),
+                "MultiNLI": np.array([3, 5]),
+            }
+
+            maj_group_nums = {
+                "Waterbirds": np.array([0, 3]),
+                "CelebA": np.array([2]),
+                "CivilComments": np.array([2]),
+                "MultiNLI": np.array([2, 4]),
             }
 
             dataset = self.__class__.__bases__[0].__name__[:-12]
             min_groups = min_group_nums[dataset]
+            maj_groups = maj_group_nums[dataset]
             totals = np.array([len(x) for x in self.dataset_train.groups[1:]])
+
             num_groups = len(totals)
             num_min_groups = len(min_groups)
-            num_maj_groups = num_groups - num_min_groups
+            num_maj_groups = len(maj_groups)
 
             smallest_min_group = min([t for j, t in enumerate(totals)
                                       if j in min_groups])
             smallest_maj_group = min([t for j, t in enumerate(totals)
-                                      if j not in min_groups])
+                                      if j in maj_groups])
 
-            downsample_num = (smallest_maj_group * num_maj_groups) / num_groups
-            downsample_num = min(int(downsample_num), smallest_min_group)
+            """
+            # for class-balanced subset vs sampler
+            if dataset == "MultiNLI":
+                s1 = sum(totals[:2])
+                s2 = sum(totals[2:4])
+                s3 = sum(totals[4:6])
+                smallest_class = min(s1, s2, s3)
+
+                r1 = totals[0] / s1
+                r2 = totals[2] / s2
+                r3 = totals[4] / s3
+
+                totals = [smallest_class*r1, smallest_class*(1-r1),
+                          smallest_class*r2, smallest_class*(1-r2),
+                          smallest_class*r3, smallest_class*(1-r3)]
+                totals = np.asarray(totals).astype(int)
+            else:
+                s1 = sum(totals[:2])
+                s2 = sum(totals[2:])
+                smallest_class = min(s1, s2)
+
+                r1 = totals[0] / s1
+                r2 = totals[2] / s2
+
+                totals = [smallest_class*r1, smallest_class*(1-r1),
+                          smallest_class*r2, smallest_class*(1-r2)]
+                totals = np.asarray(totals).astype(int)
+            """
+
+            # for class/group balancing
+            downsample_num = min(smallest_maj_group // 2, smallest_min_group)
 
             if CLASS_BALANCED or dataset in ("Waterbirds", "MultiNLI"):
                 # Waterbirds and MultiNLI are already class-balanced
@@ -203,13 +238,10 @@ class Disagreement(DataModule):
                     removed += totals[j] - new
                     totals[j] = new
 
-            if dataset == "CelebA":
-                totals[2] += removed
-            else:
-                maj_per_group = removed // num_maj_groups
-                for j, t in enumerate(totals):
-                    if j not in min_groups:
-                        totals[j] += maj_per_group
+            maj_per_group = removed // num_maj_groups
+            for j, t in enumerate(totals):
+                if j in maj_groups:
+                    totals[j] += maj_per_group
 
             indices = self.dataset_train.train_indices
             new_indices = []
@@ -227,27 +259,7 @@ class Disagreement(DataModule):
 
             new_indices = np.array(new_indices)
             self.dataset_train = Subset(self.dataset_train, new_indices)
-            #if CLASS_BALANCED: #for celeba mainly
-                #self.balanced_sampler = True
             return super().train_dataloader()
-
-            """
-            # FMOW
-            indices = self.dataset_train.train_indices
-            random.shuffle(indices)
-            random.shuffle(indices)
-            nums = [0, 0, 0, 0, 0]
-            new_indices = []
-            for x in indices:
-                for j, group in enumerate(self.dataset_train.groups[1:]):
-                    if x in group and nums[j] < 339:
-                        new_indices.append(x)
-                        nums[j] += 1
-            print(nums)
-            new_indices = np.array(new_indices)
-            self.dataset_train = Subset(self.dataset_train, new_indices)
-            return super().train_dataloader()
-            """
 
         elif self.class_balancing:
             self.balanced_sampler = True
@@ -316,20 +328,13 @@ class Disagreement(DataModule):
         agree = []
         agree_targets = []
 
-        if self.use_test_set_for_dfn:
-            all_inds = dataloader.dataset.test_indices
-            new_set = self.dataset_class(
-                self.data_dir,
-                train=False,
-                transform=self.train_transforms,
-            )
-        else:
-            all_inds = dataloader.dataset.val_indices
-            new_set = self.dataset_class(
-                self.data_dir,
-                train=True,
-                transform=self.train_transforms,
-            )
+        all_inds = dataloader.dataset.val_indices
+        print(len(all_inds))
+        new_set = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.train_transforms,
+        )
 
         if self.dfr_type in ("orig", "random"):
             targets = []
@@ -514,10 +519,7 @@ class Disagreement(DataModule):
                 indices = np.asarray(disagree)
 
         # Uses disagreement set as new training set for DFR.
-        if self.use_test_set_for_dfn:
-            new_set.train_indices = new_set.test_indices
-        else:
-            new_set.train_indices = new_set.val_indices
+        new_set.train_indices = new_set.val_indices # REMEMBER TO UNCOMMENT, ONLY FOR WATERBIRDS ERM SPLIT ABLATION
         self.dataset_train = Subset(new_set, indices)
 
         # Prints number of data in each group.
@@ -552,26 +554,11 @@ class Disagreement(DataModule):
         )
         dataset_test = self.test_preprocess(dataset_test)
 
-        dfn_inds = None
-        if self.use_test_set_for_dfn:
-            inds = dataset_test.test_indices
-            random.shuffle(inds)
-            test_inds = inds[::2]
-            dfn_inds = inds[1::2]
-            dataset_test = Subset(dataset_test, test_inds)
-
         self.dataset_test = dataset_test
 
         # Creates disagreement sets in addition to regular train/val split.
         dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
-        self.dataset_train = self._split_dataset(dataset_train, disagreement_proportion=self.disagreement_proportion)
-        self.dataset_val, self.dataset_disagreement = self._split_dataset(
-            dataset_val,
-            disagreement_proportion=self.disagreement_proportion,
-            use_test_set_for_dfn=self.use_test_set_for_dfn,
-            train=False,
-            split_test_inds=dfn_inds,
-        )
+        self.dataset_train, self.dataset_disagreement, self.dataset_val = self._split_dataset(dataset_train, dataset_val)
         
         if stage == "fit" or stage is None:
             # Performs disagreement and sets new train dataset.
@@ -580,4 +567,3 @@ class Disagreement(DataModule):
                 self.disagreement()
                 del self.model
 
-            
