@@ -125,7 +125,7 @@ def load_trainer(args, addtl_callbacks=None):
 
     return trainer
 
-def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
+def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None, verbose=True):
     """Main method for training and validation.
 
     Args:
@@ -159,8 +159,8 @@ def main(args, model_class, datamodule_class, callbacks=None, model_hooks=None):
     trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
     args.ckpt_path = None
 
-    val_metrics = trainer.validate(model, datamodule=datamodule, verbose=False)
-    test_metrics = trainer.test(model, datamodule=datamodule)
+    val_metrics = trainer.validate(model, datamodule=datamodule, verbose=verbose)
+    test_metrics = trainer.test(model, datamodule=datamodule, verbose=verbose)
     
     return model, val_metrics, test_metrics
 

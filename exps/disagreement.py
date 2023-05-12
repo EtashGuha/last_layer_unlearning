@@ -74,23 +74,28 @@ def reset_fc_hook(model):
     except:
         model.model.fc.reset_parameters()
 
-def print_metrics(test_metrics, train_dist_proportion):
+def print_metrics(metrics):#, train_dist_proportion):
     #train_dist_mean_acc = sum([p * group[f"test_acc1/dataloader_idx_{j+1}"] for j, (group, p) in enumerate(zip(test_metrics[1:], train_dist_proportion))])
     #worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"] for j, group in enumerate(test_metrics[1:])])
-    worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(test_metrics)]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
+    
+    val_worst_group_acc = min([group[f"val_acc1/dataloader_idx_{j}"] for j, group in enumerate(metrics[0])])
+
+    test_worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j}"] for j, group in enumerate(metrics[1])]) # could be wrong for erm because we do full dataloaders on erm but skip the overall dataloader for dfr for speed
 
     """
     test_dist_mean_acc = test_metrics[0]["test_acc1/dataloader_idx_0"]
     train_dist_mean_acc = round(train_dist_mean_acc * 100, 1)
     test_dist_mean_acc = round(test_dist_mean_acc * 100, 1)
     """
-    worst_group_acc = round(worst_group_acc * 100, 1)
+    val_worst_group_acc = round(val_worst_group_acc * 100, 1)
+    test_worst_group_acc = round(test_worst_group_acc * 100, 1)
 
     """
     print(f"Train Dist Mean Acc: {train_dist_mean_acc}")
     print(f"Test Dist Mean Acc: {test_dist_mean_acc}")
     """
-    print(f"Worst Group Acc: {worst_group_acc}")
+    print(f"Val Worst Group Acc: {val_worst_group_acc}")
+    print(f"Test Worst Group Acc: {test_worst_group_acc}")
 
 def dfr(
     args,
@@ -198,13 +203,16 @@ def experiment(args, model_class):
 
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
-        print(erm_metrics)
+
+        print_metrics(erm_metrics)
+
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["version"] = model.trainer.logger.version
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["metrics"] = [erm_val_metrics, erm_test_metrics]
 
         # doesn't work correctly if running multiple ERMs
         # since they overwrite each other
         # may have to enter versions manually or fix somehow
+        # it may be sufficient to do a dict merge
         # dump_state(state)
         del model
  
@@ -248,6 +256,8 @@ def experiment(args, model_class):
             reset_fc=reset_fc,
             pct_minority=pct_minority,
         )
+
+        print_metrics([val_metrics, test_metrics])
                                 
         if num_data == "all":
             orig = True if dfr_type == "orig" else False
@@ -338,24 +348,21 @@ def experiment(args, model_class):
     """
 
     for num_data in NUM_DATAS:
-        #print(f"\nGroup-Balanced DFN {num_data}:")
-        #print(orig[num][CLASS_BALANCING]["params"])
-        #print_metrics(orig[num][CLASS_BALANCING]["metrics"][1], train_dist_proportion)
         print(f"\nRandom DFN {num_data}:")
         print(dfn_state["random"][num_data]["params"])
-        print_metrics(dfn_state["random"][num_data]["metrics"][1], train_dist_proportion)
+        print_metrics(dfn_state["random"][num_data]["metrics"])#, train_dist_proportion)
         print(f"\nMisclassification DFN {num_data}:")
         print(dfn_state["miscls"][num_data]["params"])
-        print_metrics(dfn_state["miscls"][num_data]["metrics"][1], train_dist_proportion)
+        print_metrics(dfn_state["miscls"][num_data]["metrics"])#, train_dist_proportion)
         print(f"\nDropout DFN {num_data}:")
         print(dfn_state["dropout"][num_data]["params"])
-        print_metrics(dfn_state["dropout"][num_data]["metrics"][1], train_dist_proportion)
+        print_metrics(dfn_state["dropout"][num_data]["metrics"])#, train_dist_proportion)
         print(f"\nEarly Stop Disagreement DFN {num_data}:")
         print(dfn_state["earlystop"][num_data]["params"])
-        print_metrics(dfn_state["earlystop"][num_data]["metrics"][1], train_dist_proportion)
+        print_metrics(dfn_state["earlystop"][num_data]["metrics"])#, train_dist_proportion)
         print(f"\nEarly Stop Misclassification DFN {num_data}:")
         print(dfn_state["earlystop_miscls"][num_data]["params"])
-        print_metrics(dfn_state["earlystop_miscls"][num_data]["metrics"][1], train_dist_proportion)
+        print_metrics(dfn_state["earlystop_miscls"][num_data]["metrics"])#, train_dist_proportion)
 
     
 if __name__ == "__main__":
