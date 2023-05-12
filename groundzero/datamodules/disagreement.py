@@ -107,9 +107,8 @@ class Disagreement(DataModule):
                 dataset_d.val_indices = train_inds[train_num:]
                 dataset_v.val_indices = val_inds
             else:
-                random.shuffle(val_inds)
-
                 inds = np.concatenate((train_inds, val_inds))
+                random.shuffle(inds)
 
                 disagreement_num = int(self.disagreement_proportion * len(val_inds))
                 train_num = int((len(train_inds) + disagreement_num) * self.combine_val_set_pct / 100)
@@ -119,6 +118,7 @@ class Disagreement(DataModule):
                 dataset_d = Subset(dataset_val, inds[train_num:new_dis_num])
                 dataset_v = Subset(dataset_val, inds[new_dis_num:])
 
+                dataset_t.train_indices = list(range(len(dataset_t)))
                 dataset_d.val_indices = inds[train_num:new_dis_num]
                 dataset_v.val_indices = inds[new_dis_num:]
 

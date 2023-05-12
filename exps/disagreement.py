@@ -160,7 +160,7 @@ def experiment(args, model_class):
     CLASS_BALANCING = True
 
     # make this either False or a whole number
-    COMBINE_VAL_SET_PCT = 85
+    COMBINE_VAL_SET_PCT = 80
 
     CLASS_WEIGHTS = () # TODO: Can be removed
     NUM_DATAS = [10, 20, 50, 100, 200, 500]
@@ -191,19 +191,21 @@ def experiment(args, model_class):
     # Trains ERM model.
     erm_version = erm_state["version"]
     erm_metrics = erm_state["metrics"]
-    if erm_version == -1: #or erm_metrics == []:
+    #if erm_version == -1:
+    if True:
         args.balanced_sampler = ERM_CLASS_BALANCING
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class)
 
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
+        print(erm_metrics)
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["version"] = model.trainer.logger.version
         curr_state[ERM_CLASS_BALANCING][ERM_CLASS_WEIGHTS]["erm"][COMBINE_VAL_SET_PCT]["metrics"] = [erm_val_metrics, erm_test_metrics]
 
         # doesn't work correctly if running multiple ERMs
         # since they overwrite each other
         # may have to enter versions manually or fix somehow
-        dump_state(state)
+        # dump_state(state)
         del model
  
     # Gets last-epoch ERM weights.
