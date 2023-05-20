@@ -9,7 +9,11 @@ import os
 import os.path as osp
 import pickle
 
+# Imports PyTorch packages.
+from pytorch_lightning import Trainer
+
 # Imports groundzero packages.
+from groundzero.args import add_input_args
 from groundzero.datamodules.celeba import CelebADisagreement
 from groundzero.datamodules.civilcomments import CivilCommentsDisagreement
 from groundzero.datamodules.multinli import MultiNLIDisagreement
@@ -29,13 +33,13 @@ def parse_args():
     parser = add_input_args(parser)
     parser = Trainer.add_argparse_args(parser)
     
-    parser.add("balance_erm", default=True, type=lambda x: bool(strtobool(x)))
-    parser.add("balance_finetune", choices=["sampler", "subset", "none"], default="sampler")
-    parser.add("demo", default=False, type=lambda x: bool(strtobool(x)))
-    parser.add("no_self", default=False, type=lambda x: bool(strtobool(x)))
-    parser.add("split", choices=["combined", "train"], default="train")
-    parser.add("train_pct", default=100, type=int)
-    parser.add("worst_group_ablation", default=False, type=lambda x: bool(strtobool(x)))
+    parser.add("--balance_erm", default=True, type=lambda x: bool(strtobool(x)))
+    parser.add("--balance_finetune", choices=["sampler", "subset", "none"], default="sampler")
+    parser.add("--demo", action="store_true")
+    parser.add("--no_self", action="store_true")
+    parser.add("--split", choices=["combined", "train"], default="train")
+    parser.add("--train_pct", default=100, type=int)
+    parser.add("--worst_group_ablation", action="store_true")
 
     args = parser.parse_args()
 
@@ -79,7 +83,7 @@ def set_training_parameters(args):
     args.dropout_probs = [0.5, 0.7, 0.9]
     args.early_stop_nums = [1, 2, 5]
 
-    return args, datamodule_class
+    return datamodule_class
 
 def load_erm():
     if osp.isfile("erm.pkl"):
@@ -145,15 +149,17 @@ def print_metrics(metrics):
     print(f"Val Worst Group Acc: {val_worst_group_acc}")
     print(f"Test Average Acc: {test_avg_acc}")
     print(f"Test Worst Group Acc: {test_worst_group_acc}")
+    print()
 
 def print_results(erm_metrics, results, keys):
-    print("\n---Experiment Results---")
-    print("\nERM:")
+    print("---Experiment Results---")
+    print("\nERM")
     print_metrics(erm_metrics)
 
     for key in keys:
-        print(f"\n{key.capwords()}")
+        print(key.title())
         print_metrics(results[key]["metrics"])
+        print(f"Best params: {results[key]['params']}")
 
 def finetune_last_layer(
     args,
@@ -168,11 +174,11 @@ def finetune_last_layer(
     # Sets parameters for retraining or finetuning.
     # finetune_num_data is only set for finetuning.
     if finetune_num_data:
-        finetune_epochs = args.retrain_epochs
-        reset_fc = True
-    else:
         finetune_epochs = args.finetune_epochs_scale // finetune_num_data
         reset_fc = False
+    else:
+        finetune_epochs = args.retrain_epochs
+        reset_fc = True
 
     disagreement_args = deepcopy(args)
     disagreement_args.finetune_type = finetune_type
@@ -225,8 +231,8 @@ def experiment(args, model_class):
     erm = load_erm()
     curr_erm = erm[args.datamodule][args.seed][args.balance_erm][args.split][args.train_pct]
 
-    # Sets datamodule parameters.
-    args, datamodule_class = set_datamodule_parameters(args)
+    # Sets training parameters.
+    datamodule_class = set_training_parameters(args)
 
     # Trains ERM model.
     erm_version = curr_erm["version"]
@@ -241,12 +247,16 @@ def experiment(args, model_class):
 
         curr_erm["version"] = erm_version
         curr_erm["metrics"] = erm_metrics
+        dump_erm(curr_erm)
+        del model
+    elif not erm_metrics:
+        args.weights = get_weights(erm_version, ind=-1)
+        _, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class, eval_only=True)
 
+        erm_metrics = [erm_val_metrics, erm_test_metrics]
+        curr_erm["metrics"] = erm_metrics
         dump_erm(curr_erm)
 
-        print_metrics(erm_metrics)
-        del model
- 
     # Gets last-epoch ERM weights.
     args.weights = get_weights(erm_version, ind=-1)
 
@@ -274,7 +284,9 @@ def experiment(args, model_class):
         finetune_num_data=None,
         worst_group_pct=None,
     ):
-        param_str = ""
+        args.finetune_lr = finetune_lr if finetune_lr else args.lr
+
+        param_str = f" LR {args.finetune_lr}"
         if finetune_num_data:
             param_str += f" Num Data {finetune_num_data}"
         if dropout_prob:
@@ -283,11 +295,11 @@ def experiment(args, model_class):
             param_str += f" Early Stop {early_stop_num}"
         if worst_group_pct:
             param_str += f" Worst-group Pct {worst_group_pct}"
-        print(f"{finetune_type.capwords()}{param_str}")
+        print(f"{finetune_type.title()}{param_str}")
 
+        early_stop_weights = None
         if early_stop_num:
             early_stop_weights = get_weights(erm_version, ind=early_stop_num-1)
-        args.finetune_lr = finetune_lr if finetune_lr else args.retrain_lr
         val_metrics, test_metrics = finetune_last_layer(
             args,
             datamodule_class,
@@ -306,7 +318,7 @@ def experiment(args, model_class):
 
         if val_worst_group_acc > results[finetune_type]["val_worst_group_acc"]:
             results[finetune_type]["val_worst_group_acc"] = val_worst_group_acc
-            results[finetune_type]["metrics"] = metrics
+            results[finetune_type]["metrics"] = [val_metrics, test_metrics]
 
             params = []
             if finetune_num_data:
@@ -321,50 +333,51 @@ def experiment(args, model_class):
 
     # Performs worst-group data ablation.
     if args.worst_group_ablation:
-        for worst_group_pct in [2.5, 5] + [12.5 * j for j in range(1, 9)]
+        for worst_group_pct in [2.5, 5] + [12.5 * j for j in range(1, 9)]:
             finetune_helper("class-balanced retraining", worst_group_pct=worst_group_pct)
         return
 
     # Performs early-stop disagreement demo.
     if args.demo:
         finetune_helper(
-            "early_stop_disagreement",
+            "early-stop disagreement finetuning",
             early_stop_num=1,
             finetune_lr=1e-2,
             finetune_num_data=100,
         )
+        print_results(erm_metrics, results, finetune_types[-1])
         return
 
     # Performs last-layer retraining.
-    finetune_helper("group-unbalanced retraining")
+    #finetune_helper("group-unbalanced retraining")
     finetune_helper("group-balanced retraining")
 
     if args.no_self:
-        print_results(erm_metrics, results, finetune_types[:3])
+        print_results(erm_metrics, results, finetune_types[:2])
         return
 
     # Perform SELF hyperparameter search using worst-group validation accuracy.
     for finetune_num_data in args.finetune_num_datas:
         for finetune_lr in args.finetune_lrs:
             def finetune_helper2(finetune_type, dropout_prob=0, early_stop_num=None):
-                    val_metrics, test_metrics = finetune_helper(
-                        finetune_type,
-                        dropout_prob=dropout_prob,
-                        early_stop_num=early_stop_num,
-                        finetune_lr=finetune_lr,
-                        finetune_num_data=finetune_num_data,
-                    )
+                finetune_helper(
+                    finetune_type,
+                    dropout_prob=dropout_prob,
+                    early_stop_num=early_stop_num,
+                    finetune_lr=finetune_lr,
+                    finetune_num_data=finetune_num_data,
+                )
 
-                    finetune_helper2("misclassification finetuning")
+            finetune_helper2("misclassification finetuning")
 
-                    for early_stop_num in args.early_stop_nums:
-                        finetune_helper2("early stop misclassification finetuning", early_stop_num=early_stop_num)
+            for early_stop_num in args.early_stop_nums:
+                finetune_helper2("early-stop misclassification finetuning", early_stop_num=early_stop_num)
 
-                    for dropout_prob in args.dropout_probs:
-                        finetune_helper2("dropout disagreement finetuning", dropout_prob=dropout_prob)
+            for dropout_prob in args.dropout_probs:
+                finetune_helper2("dropout disagreement finetuning", dropout_prob=dropout_prob)
 
-                    for early_stop_num in args.early_stop_nums:
-                        finetune_helper2("early stop disagreement finetuning", early_stop_num=early_stop_num)
+            for early_stop_num in args.early_stop_nums:
+                finetune_helper2("early-stop disagreement finetuning", early_stop_num=early_stop_num)
 
     print_results(erm_metrics, results, finetune_types)
 

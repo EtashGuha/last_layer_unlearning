@@ -55,8 +55,8 @@ class Disagreement(DataModule):
         
         self.heldout_pct = 0.5
 
-        self.finetune_balance = args.finetune_balance
-        self.finetune_type = args.finetune_type
+        self.balance_finetune = args.balance_finetune
+        self.finetune_type = args.finetune_type if hasattr(args, "finetune_type") else None
         self.split = args.split
         self.train_pct = args.train_pct
 
@@ -86,6 +86,8 @@ class Disagreement(DataModule):
         train_inds = dataset_train.train_indices
         val_inds = dataset_val.val_indices
 
+        random.shuffle(val_inds)
+
         disagreement_num = int(self.heldout_pct * len(val_inds))
         new_val_inds = val_inds[disagreement_num:]
 
@@ -95,7 +97,7 @@ class Disagreement(DataModule):
         elif self.split == "train":
             random.shuffle(train_inds)
             train_num = int(len(train_inds) * self.train_pct / 100)
-            new_train_inds = train_inds[:train_num])
+            new_train_inds = train_inds[:train_num]
             new_dis_inds = train_inds[train_num:]
         elif self.split == "combined":
             combined_inds = np.concatenate((train_inds, val_inds))
@@ -121,9 +123,15 @@ class Disagreement(DataModule):
         return dataset_t, dataset_d, dataset_v
 
     def train_dataloader(self):
-        """Returns DataLoader for the train dataset (after disagreement)."""
+        """Returns DataLoader for the train dataset (after disagreement).
         
-        if self.finetune_type == "group-unbalanced retraining"
+           This method also handles class- and group-balancing, either by
+           sampling the data to ensure balanced minibatches ("sampler")
+           or by training on a balanced subset of the data ("subset").
+           TODO: Describe worst-group-pct ablation.
+        """
+        
+        if self.finetune_type == "group-unbalanced retraining":
             if self.worst_group_pct:
                 # Sets the worst groups (zero-indexed).
                 min_group_nums = {
@@ -202,8 +210,6 @@ class Disagreement(DataModule):
                 return super().train_dataloader()
         elif self.finetune_type == "group-balanced retraining":
             indices = self.dataset_train.train_indices
-            random.shuffle(indices)
-
             groups = np.zeros(len(indices), dtype=np.int32)
             for i, x in enumerate(indices):
                 for j, group in enumerate(self.dataset_train.groups[1:]):
@@ -217,14 +223,16 @@ class Disagreement(DataModule):
                 sampler = WeightedRandomSampler(weights, len(weights))
                 return self._data_loader(self.dataset_train, sampler=sampler)
             elif self.balance_finetune == "subset":
+                # TODO: Shuffle indices and groups together?
                 min_group = min([len(x) for x in self.dataset_train.groups[1:]])
                 counts = [0] * len(self.dataset_train.groups[1:])
 
                 subset = []
                 for idx, group in zip(indices, groups):
-                    if counts[grp] < min_group:
+                    if counts[group] < min_group:
                         subset.append(idx)
-                        counts[grp] += 1
+                        counts[group] += 1
+                print(f"Balanced subset: {counts}")
 
                 self.dataset_train = Subset(self.dataset_train, subset)
 
@@ -255,13 +263,13 @@ class Disagreement(DataModule):
 
         return self._data_loader(self.dataset_disagreement)
 
-    def print_disagreements_by_group(self, dataset, all_inds, disagree):
+    def print_disagreements_by_group(self, dataset, all_inds, disagree=None):
         """Prints number of disagreements occuring in each group.
         
         Args:
             dataset: A groundzero.datamodules.Dataset.
             all_inds: An np.ndarray of all indices in the disagreement set.
-            disagree: An np.ndarray of all disagreed indices.
+            disagree: An optional np.ndarray of all disagreed indices.
         """
 
         labels_and_inds = zip(
@@ -271,11 +279,11 @@ class Disagreement(DataModule):
 
         print("Disagreements by group")
         for label, inds in labels_and_inds:
-            # Doesn't print for group 0, by convention containing all indices.
-            nums = []
-            for group in dataset.groups[1:]:
-                nums.append(len(np.intersect1d(inds, group)))
-            print(f"{label}: {nums}")
+            if inds is not None:
+                nums = []
+                for group in dataset.groups[1:]: # skips group 0 (all inds)
+                    nums.append(len(np.intersect1d(inds, group)))
+                print(f"{label}: {nums}")
     
     def disagreement(self):
         """Computes finetuning set and saves it as self.dataset_train.
@@ -299,8 +307,8 @@ class Disagreement(DataModule):
         new_set.train_indices = np.concatenate((new_set.train_indices, new_set.val_indices))
 
         if "retraining" in self.finetune_type:
-            self.train_dataset = Subset(new_set, all_inds)
-            self.print_disagreements_by_group(new_set, all_inds, [])
+            self.dataset_train = Subset(new_set, all_inds)
+            self.print_disagreements_by_group(new_set, all_inds)
             return
 
         all_orig_logits = []
@@ -362,8 +370,8 @@ class Disagreement(DataModule):
 
         disagree = all_inds[disagreements]
             
-        self.dataset_train = Subset(new_set, indices)
-        self.print_disagreements_by_group(new_set, all_inds, disagree)
+        self.dataset_train = Subset(new_set, disagree)
+        self.print_disagreements_by_group(new_set, all_inds, disagree=disagree)
         
     def setup(self, stage=None):
         """Instantiates and preprocesses datasets.
