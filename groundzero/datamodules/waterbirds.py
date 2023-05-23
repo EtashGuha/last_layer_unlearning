@@ -31,8 +31,8 @@ from groundzero.datamodules.disagreement import Disagreement
 class WaterbirdsDataset(Dataset):
     """Dataset for the Waterbirds dataset."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *xargs, **kwargs):
+        super().__init__(*xargs, **kwargs)
 
     def download(self):
         waterbirds_dir = osp.join(self.root, "waterbirds")

@@ -10,8 +10,12 @@ import numpy as np
 
 # Imports PyTorch packages.
 from torch import Generator, randperm
-from torch.utils.data import DataLoader, random_split, Subset, WeightedRandomSampler
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
+
+# Imports groundzero packages.
+from groundzero.datamodules.dataset import Subset
+from groundzero.utils import random_split
 
 
 class DataModule(VisionDataModule):
@@ -124,7 +128,7 @@ class DataModule(VisionDataModule):
             # TODO: Ensure train_indices, etc. are specified for preset splits.
             # If label noise is nonzero with a preset split, but train_indices
             # is not set, then this procedure will apply noise to the val set!
-            if hasattr(dataset_train, "train_indices"):
+            if dataset_train.train_indices is not None:
                 train_indices = dataset_train.train_indices
             else:
                 train_indices = randperm(
@@ -177,7 +181,7 @@ class DataModule(VisionDataModule):
 
             dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
             self.dataset_train = self._split_dataset(dataset_train)
-            self.dataset_val = self._split_dataset(dataset_val, train=False)
+            self.dataset_val = self._split_dataset(dataset_val, val=True)
             
         if stage == "test" or stage is None:
             dataset_test = self.dataset_class(
@@ -188,7 +192,7 @@ class DataModule(VisionDataModule):
 
             self.dataset_test = self.test_preprocess(dataset_test)
 
-    def _split_dataset(self, dataset, train=True):
+    def _split_dataset(self, dataset, val=False):
         """Splits dataset into training and validation subsets.
         
         Args:
@@ -196,10 +200,10 @@ class DataModule(VisionDataModule):
             train: Whether to return the train set or val set.
 
         Returns:
-            A torch.utils.data.Subset of the given dataset with the desired split.
+            A groundzero.dataset.Subset of the given dataset with the desired split.
         """
 
-        if train and hasattr(dataset, "train_indices") and hasattr(dataset, "val_indices"):
+        if dataset.train_indices is not None and dataset.val_indices is not None:
             # Calculates a preset split based on the given indices.
             dataset_train = Subset(dataset, dataset.train_indices)
             dataset_val = Subset(dataset, dataset.val_indices)
@@ -212,10 +216,10 @@ class DataModule(VisionDataModule):
                 splits,
                 generator=Generator().manual_seed(self.seed),
             )
-
-        if train:
-            return dataset_train
-        return dataset_val
+            
+        if val:
+            return dataset_val
+        return dataset_train
 
     def train_dataloader(self):
         """Returns DataLoader for the train dataset."""
@@ -237,7 +241,7 @@ class DataModule(VisionDataModule):
     def val_dataloader(self):
         """Returns DataLoader(s) for the val dataset."""
 
-        if hasattr(self.dataset_val, "groups") and len(self.dataset_val.groups):
+        if self.dataset_val.groups is not None and len(self.dataset_val.groups):
             # Returns a list of DataLoaders for each group/split.
             dataloaders = []
             for group in self.dataset_val.groups:
@@ -248,7 +252,7 @@ class DataModule(VisionDataModule):
     def test_dataloader(self):
         """Returns DataLoader(s) for the test dataset."""
 
-        if hasattr(self.dataset_test, "groups") and len(self.dataset_test.groups):
+        if self.dataset_test.groups is not None and len(self.dataset_test.groups):
             # Returns a list of DataLoaders for each group/split.
             dataloaders = []
             for group in self.dataset_test.groups:

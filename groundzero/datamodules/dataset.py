@@ -84,8 +84,8 @@ class Dataset(VisionDataset):
                     np.in1d(self.test_indices, group).nonzero()[0]
                     for group in self.groups
                 ]
-            self.train_indices = np.array([])
-            self.val_indices = np.array([])
+            self.train_indices = None
+            self.val_indices = None
             self.test_indices = np.arange(len(self.data))
 
     def __len__(self):
@@ -139,10 +139,12 @@ class Subset(Dataset):
         self.transform = dataset.transform
         self.target_transform = dataset.target_transform
         self.train = dataset.train
+
         self.groups = dataset.groups
 
         self.data = dataset.data[indices]
         self.targets = dataset.targets[indices]
+
         self.train_indices = dataset.train_indices
         self.val_indices = dataset.val_indices
         self.test_indices = dataset.test_indices

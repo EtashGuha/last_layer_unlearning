@@ -8,6 +8,10 @@ from glob import glob
 import os
 import os.path as osp
 import pickle
+import sys
+
+# Imports Python packages.
+import numpy as np
 
 # Imports PyTorch packages.
 from pytorch_lightning import Trainer
@@ -15,6 +19,7 @@ from pytorch_lightning import Trainer
 # Imports groundzero packages.
 from groundzero.args import add_input_args
 from groundzero.datamodules.celeba import CelebADisagreement
+from groundzero.datamodules.cifar10 import CIFAR10Disagreement
 from groundzero.datamodules.civilcomments import CivilCommentsDisagreement
 from groundzero.datamodules.multinli import MultiNLIDisagreement
 from groundzero.datamodules.waterbirds import WaterbirdsDisagreement
@@ -53,29 +58,40 @@ def get_weights(version, ind=-1):
 
 def set_training_parameters(args):
     if args.datamodule == "waterbirds":
-        datamodule_class = WaterbirdsDisagreement
+        args.datamodule_class = WaterbirdsDisagreement
         args.num_classes = 2
         args.retrain_epochs = 100
         args.finetune_epochs_scale = 5000
         args.finetune_lrs = [1e-5, 1e-4, 1e-3, 1e-2]
+        args.test_group_proportions = np.array([0.3880, 0.3880, 0.1120, 0.1120])
     elif args.datamodule == "celeba":
-        datamodule_class = CelebADisagreement
+        args.datamodule_class = CelebADisagreement
         args.num_classes = 2
         args.retrain_epochs = 100
         args.finetune_epochs_scale = 5000
         args.finetune_lrs = [1e-5, 1e-4, 1e-3, 1e-2]
+        args.test_group_proportions = np.array([0.4893, 0.3775, 0.1242, 0.0090])
     elif args.datamodule == "civilcomments":
-        datamodule_class = CivilCommentsDisagreement
+        args.datamodule_class = CivilCommentsDisagreement
         args.num_classes = 2
         args.retrain_epochs = 10
         args.finetune_epochs_scale = 10000
         args.finetune_lrs = [1e-7, 1e-6, 1e-5, 1e-4]
+        args.test_group_proportions = np.array([0.5590, 0.3272, 0.0483, 0.0655])
     elif args.datamodule == "multinli":
-        datamodule_class = MultiNLIDisagreement
+        args.datamodule_class = MultiNLIDisagreement
         args.num_classes = 3
         args.retrain_epochs = 10
         args.finetune_epochs_scale = 10000
         args.finetune_lrs = [1e-7, 1e-6, 1e-5, 1e-4]
+        args.test_group_proportions = np.array([0.2797, 0.0538, 0.3273, 0.0072, 0.3228, 0.0093])
+    elif args.datamodule == "cifar10":
+        args.datamodule_class = CIFAR10Disagreement
+        args.num_classes = 10
+        args.retrain_epochs = 100
+        args.finetune_epochs_scale = None
+        args.finetune_lrs = None
+        args.test_group_proportions = np.array([0.1] * 10)
     else:
         raise ValueError(f"DataModule {args.datamodule} not supported.")
 
@@ -83,14 +99,12 @@ def set_training_parameters(args):
     args.dropout_probs = [0.5, 0.7, 0.9]
     args.early_stop_nums = [1, 2, 5]
 
-    return datamodule_class
-
 def load_erm():
     if osp.isfile("erm.pkl"):
         with open("erm.pkl", "rb") as f:
             erm = pickle.load(f)
     else: 
-        datasets = ["waterbirds", "celeba", "civilcomments", "multinli"]
+        datasets = ["waterbirds", "celeba", "civilcomments", "multinli", "cifar10"]
         seeds = [1, 2, 3]
         balance = [True, False]
         split = ["train", "combined"]
@@ -128,16 +142,28 @@ def reset_fc_hook(model):
     except:
         model.model.fc.reset_parameters()
 
-def print_metrics(metrics):
+def print_metrics(metrics, test_group_proportions):
     val_metrics, test_metrics = metrics
 
-    val_avg_acc = val_metrics[0]["val_acc1/dataloader_idx_0"]
-    val_worst_group_acc = min([group[f"val_acc1/dataloader_idx_{j+1}"]
-                               for j, group in enumerate(val_metrics[1:])])
+    # Handles case when groups are undefined (for CIFAR-10).
+    if "test_acc1" in test_metrics[0]:
+        test_avg_acc = test_metrics[0]["test_acc1"]
+        test_worst_class_acc = test_metrics[0]["test_worst_class_acc1"]
+        print(f"Test Average Acc: {test_avg_acc}")
+        print(f"Test Worst Class Acc: {test_worst_class_acc}")
+        print()
+        return
 
-    test_avg_acc = test_metrics[0]["test_acc1/dataloader_idx_0"]
-    test_worst_group_acc = min([group[f"test_acc1/dataloader_idx_{j+1}"]
-                                for j, group in enumerate(test_metrics[1:])])
+    val_group_accs = [group[f"val_acc1/dataloader_idx_{j+1}"]
+                      for j, group in enumerate(val_metrics[1:])]
+    test_group_accs = [group[f"test_acc1/dataloader_idx_{j}"]
+                      for j, group in enumerate(test_metrics)]
+
+    val_avg_acc = val_metrics[0]["val_acc1/dataloader_idx_0"]
+    test_avg_acc = sum(test_group_accs * test_group_proportions)
+
+    val_worst_group_acc = min(val_group_accs) 
+    test_worst_group_acc = min(test_group_accs) 
 
     val_avg_acc = round(val_avg_acc * 100, 1)
     val_worst_group_acc = round(val_worst_group_acc * 100, 1)
@@ -151,19 +177,19 @@ def print_metrics(metrics):
     print(f"Test Worst Group Acc: {test_worst_group_acc}")
     print()
 
-def print_results(erm_metrics, results, keys):
+def print_results(erm_metrics, results, keys, test_group_proportions):
     print("---Experiment Results---")
     print("\nERM")
     print_metrics(erm_metrics)
 
     for key in keys:
         print(key.title())
-        print_metrics(results[key]["metrics"])
-        print(f"Best params: {results[key]['params']}")
+        if "finetuning" in key:
+            print(f"Best params: {results[key]['params']}")
+        print_metrics(results[key]["metrics"], test_group_proportions)
 
 def finetune_last_layer(
     args,
-    datamodule_class,
     finetune_type,
     model_class,
     dropout_prob=0,
@@ -220,7 +246,7 @@ def finetune_last_layer(
     _, val_metrics, test_metrics = main(
         finetune_args,
         model_class,
-        disagreement_class(datamodule_class),
+        disagreement_class(args.datamodule_class),
         model_hooks=model_hooks,
     )
 
@@ -231,15 +257,16 @@ def experiment(args, model_class):
     erm = load_erm()
     curr_erm = erm[args.datamodule][args.seed][args.balance_erm][args.split][args.train_pct]
 
-    # Sets training parameters.
-    datamodule_class = set_training_parameters(args)
+    # Adds experiment-specific parameters to args.
+    set_training_parameters(args)
 
     # Trains ERM model.
     erm_version = curr_erm["version"]
     erm_metrics = curr_erm["metrics"]
+    erm_version = -1
     if erm_version == -1:
         args.balanced_sampler = True if args.balance_erm else False
-        model, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class)
+        model, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class)
         args.balanced_sampler = False
 
         erm_version = model.trainer.logger.version
@@ -251,11 +278,25 @@ def experiment(args, model_class):
         del model
     elif not erm_metrics:
         args.weights = get_weights(erm_version, ind=-1)
-        _, erm_val_metrics, erm_test_metrics = main(args, model_class, datamodule_class, eval_only=True)
+        _, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class, eval_only=True)
 
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         curr_erm["metrics"] = erm_metrics
         dump_erm(curr_erm)
+
+    def print_metrics2(metrics):
+        return print_metrics(metrics, args.test_group_proportions)
+
+    def print_results2(results, keys):
+        return print_results(erm_metrics, results, keys, args.test_group_proportions)
+
+    print_metrics2(erm_metrics)
+
+    # When these two arguments are passed, the entire held-out set
+    # (except the actual validation set) is used for training. So,
+    # there is no data left for last-layer retraining, and we return.
+    if args.split == "combined" and args.train_pct == 100:
+        return
 
     # Gets last-epoch ERM weights.
     args.weights = get_weights(erm_version, ind=-1)
@@ -302,7 +343,6 @@ def experiment(args, model_class):
             early_stop_weights = get_weights(erm_version, ind=early_stop_num-1)
         val_metrics, test_metrics = finetune_last_layer(
             args,
-            datamodule_class,
             finetune_type,
             model_class,
             dropout_prob=dropout_prob,
@@ -311,7 +351,11 @@ def experiment(args, model_class):
             worst_group_pct=worst_group_pct,
         )
 
-        print_metrics([val_metrics, test_metrics])
+        print_metrics([val_metrics, test_metrics], test_group_proportions=args.test_group_proportions)
+
+        # Hack for CIFAR-10
+        if "test_acc1" in test_metrics[0].keys():
+            sys.exit(0)
 
         val_worst_group_acc = min([group[f"val_acc1/dataloader_idx_{j+1}"]
                                    for j, group in enumerate(val_metrics[1:])])
@@ -345,15 +389,15 @@ def experiment(args, model_class):
             finetune_lr=1e-2,
             finetune_num_data=100,
         )
-        print_results(erm_metrics, results, finetune_types[-1])
+        print_results2(results, finetune_types[-1])
         return
 
     # Performs last-layer retraining.
-    #finetune_helper("group-unbalanced retraining")
+    finetune_helper("group-unbalanced retraining")
     finetune_helper("group-balanced retraining")
 
     if args.no_self:
-        print_results(erm_metrics, results, finetune_types[:2])
+        print_results2(results, finetune_types[:2])
         return
 
     # Perform SELF hyperparameter search using worst-group validation accuracy.
@@ -379,7 +423,7 @@ def experiment(args, model_class):
             for early_stop_num in args.early_stop_nums:
                 finetune_helper2("early-stop disagreement finetuning", early_stop_num=early_stop_num)
 
-    print_results(erm_metrics, results, finetune_types)
+    print_results2(results, finetune_types)
 
     
 if __name__ == "__main__":

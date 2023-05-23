@@ -25,8 +25,8 @@ from groundzero.datamodules.disagreement import Disagreement
 class MultiNLIDataset(Dataset):
     """Dataset for the MultiNLI dataset."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *xargs, **kwargs):
+        super().__init__(*xargs, **kwargs)
 
     def download(self):
         multinli_dir = osp.join(self.root, "multinli")

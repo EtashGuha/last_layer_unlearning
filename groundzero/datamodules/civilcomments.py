@@ -20,8 +20,8 @@ from groundzero.utils import to_np
 class CivilCommentsDataset(Dataset):
     """Dataset for the CivilComments dataset."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *xargs, **kwargs):
+        super().__init__(*xargs, **kwargs)
 
     def download(self):
         pass

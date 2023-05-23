@@ -1,10 +1,8 @@
 """DataModule for disagreement-based datasets."""
 
-# Imports Python builtins.
-import random
-
 # Imports Python packages.
 import numpy as np
+from numpy.random import default_rng
 
 # Imports PyTorch packages.
 import torch
@@ -15,8 +13,6 @@ from torch.utils.data import WeightedRandomSampler
 from groundzero.datamodules.dataset import Subset
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.utils import to_np
-
-# TODO: Change disagreement names to SELF or finetuning?
 
 
 class Disagreement(DataModule):
@@ -65,15 +61,6 @@ class Disagreement(DataModule):
         self.num_data = num_data
         self.worst_group_pct = worst_group_pct
 
-    def load_msg(self):
-        """Returns a descriptive message about the DataModule configuration."""
-
-        msg = super().load_msg()
-        msg = msg[:-1] + (
-            f", with proportion {self.heldout_pct}."
-        )
-        return msg
-
     def _split_dataset(self, dataset_train, dataset_val):
         """Splits dataset into training and validation subsets.
 
@@ -83,10 +70,21 @@ class Disagreement(DataModule):
         Returns:
         """
 
-        train_inds = dataset_train.train_indices
-        val_inds = dataset_val.val_indices
-
-        random.shuffle(val_inds)
+        if dataset_train.train_indices is not None:
+            train_inds = dataset_train.train_indices
+            val_inds = dataset_val.val_indices
+            default_rng(seed=self.seed).shuffle(val_inds)
+        else:
+            len_dataset = len(dataset_train)
+            len_train, _ = self._get_splits(len_dataset)
+            inds = np.arange(len_dataset)
+            default_rng(seed=self.seed).shuffle(inds)
+            train_inds = inds[:len_train]
+            val_inds = inds[len_train:]
+            dataset_train.train_indices = train_inds
+            dataset_val.train_indices = train_inds
+            dataset_train.val_indices = val_inds
+            dataset_val.val_indices = val_inds
 
         disagreement_num = int(self.heldout_pct * len(val_inds))
         new_val_inds = val_inds[disagreement_num:]
@@ -95,7 +93,7 @@ class Disagreement(DataModule):
             new_train_inds = train_inds
             new_dis_inds = val_inds[:disagreement_num]
         elif self.split == "train":
-            random.shuffle(train_inds)
+            default_rng(seed=self.seed).shuffle(train_inds)
             train_num = int(len(train_inds) * self.train_pct / 100)
             new_train_inds = train_inds[:train_num]
             new_dis_inds = train_inds[train_num:]
@@ -105,7 +103,7 @@ class Disagreement(DataModule):
             new_dis_num = len(combined_inds) - int((1 - self.heldout_pct) * len(val_inds))
             new_combined_inds = combined_inds[:new_dis_num]
 
-            random.shuffle(new_combined_inds)
+            default_rng(seed=self.seed).shuffle(new_combined_inds)
             new_train_inds = new_combined_inds[:train_num]
             new_dis_inds = new_combined_inds[train_num:]
 
@@ -183,7 +181,7 @@ class Disagreement(DataModule):
                         totals[j] += maj_per_group
 
                 indices = self.dataset_train.train_indices
-                random.shuffle(indices)
+                defaut_rng(seed=self.seed).shuffle(indices)
 
                 new_indices = []
                 nums = [0] * num_groups
@@ -204,7 +202,28 @@ class Disagreement(DataModule):
                 self.balanced_sampler = True
                 return super().train_dataloader()
             elif self.balance_finetune == "subset":
-                raise NotImplementedError()
+                indices = self.dataset_train.train_indices
+                targets = self.dataset_train.targets[indices]
+
+                # Shuffles indices and targets in unison.
+                p = default_rng(seed=self.seed).permutation(len(indices))
+                indices = indices[p]
+                targets = targets[p]
+
+                min_target = min(np.unique(targets, return_counts=True)[1])
+                counts = [0] * self.num_classes
+
+                subset = []
+                for idx, target in zip(indices, targets):
+                    if counts[target] < min_target:
+                        subset.append(idx)
+                        counts[target] += 1
+                print(f"Balanced subset: {counts}")
+
+                self.dataset_train = Subset(self.dataset_train, subset)
+
+                self.balanced_sampler=False
+                return super().train_dataloader()
             elif self.balance_finetune == "none":
                 self.balanced_sampler = False
                 return super().train_dataloader()
@@ -223,7 +242,11 @@ class Disagreement(DataModule):
                 sampler = WeightedRandomSampler(weights, len(weights))
                 return self._data_loader(self.dataset_train, sampler=sampler)
             elif self.balance_finetune == "subset":
-                # TODO: Shuffle indices and groups together?
+                # Shuffles indices and groups in unison.
+                p = default_rng(seed=self.seed).permutation(len(indices))
+                indices = indices[p]
+                groups = groups[p]
+
                 min_group = min([len(x) for x in self.dataset_train.groups[1:]])
                 counts = [0] * len(self.dataset_train.groups[1:])
 
@@ -245,7 +268,27 @@ class Disagreement(DataModule):
                 self.balanced_sampler = True
                 return super().train_dataloader()
             elif self.balance_finetune == "subset":
-                raise NotImplementedError()
+                indices = self.dataset_train.train_indices
+                targets = self.dataset_train.targets[indices]
+
+                # Shuffles indices and targets in unison.
+                p = default_rng(seed=self.seed).permutation(len(indices))
+                indices = indices[p]
+                targets = targets[p]
+
+                min_target = min(np.unique(targets, return_counts=True)[1])
+                counts = [0] * self.num_classes
+
+                subset = []
+                for idx, target in zip(indices, targets):
+                    if counts[target] < min_target:
+                        subset.append(idx)
+                        counts[target] += 1
+
+                self.dataset_train = Subset(self.dataset_train, subset)
+
+                self.balanced_sampler=False
+                return super().train_dataloader()
             elif self.balance_finetune == "none":
                 self.balanced_sampler = False
                 return super().train_dataloader()
@@ -256,6 +299,8 @@ class Disagreement(DataModule):
 
     def test_dataloader(self):
         dataloaders = super().test_dataloader()
+        if type(dataloaders) == list:
+            return dataloaders[1:] # skip overall dataloader
         return dataloaders
 
     def disagreement_dataloader(self):
@@ -304,11 +349,16 @@ class Disagreement(DataModule):
             train=True,
             transform=self.train_transforms,
         )
-        new_set.train_indices = np.concatenate((new_set.train_indices, new_set.val_indices))
+
+        if new_set.train_indices is not None and new_set.val_indices is not None:
+            new_set.train_indices = np.concatenate((new_set.train_indices, new_set.val_indices))
+        else:
+            new_set.train_indices = np.arange(len(new_set))
 
         if "retraining" in self.finetune_type:
             self.dataset_train = Subset(new_set, all_inds)
-            self.print_disagreements_by_group(new_set, all_inds)
+            if new_set.groups is not None: #cifar 10 hack
+                self.print_disagreements_by_group(new_set, all_inds)
             return
 
         all_orig_logits = []
