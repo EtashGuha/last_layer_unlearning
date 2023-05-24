@@ -1,0 +1,13 @@
+accelerator: gpu
+batch_size: 256
+check_val_every_n_epoch: 100
+ckpt_every_n_epoch: 100
+cnn_initial_width: 64
+cnn_padding: 1
+datamodule: cifar100
+devices: 1
+lr: 0.1
+lr_scheduler: cosine
+max_epochs: 400
+model: resnet
+resnet_small_input: True

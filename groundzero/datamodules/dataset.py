@@ -55,7 +55,8 @@ class Dataset(VisionDataset):
             download: Whether to download the dataset to disk.
         """
 
-        super().__init__(
+        VisionDataset.__init__(
+            self,
             root,
             transform=transform,
             target_transform=target_transform,

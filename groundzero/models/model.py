@@ -4,6 +4,7 @@
 from abc import abstractmethod
 
 # Imports PyTorch packages.
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 import pytorch_lightning as pl
 import torch
 from torch import nn
@@ -79,6 +80,12 @@ class Model(pl.LightningModule):
             scheduler = CosineAnnealingLR(
                 optimizer,
                 T_max=self.hparams.max_epochs,
+            )
+        elif self.hparams.lr_scheduler == "cosine_warmup":
+            scheduler = LinearWarmupCosineAnnealingLR(
+                optimizer,
+                self.hparams.warmup_epochs,
+                self.hparams.max_epochs,
             )
         elif self.hparams.lr_scheduler == "linear":
             scheduler = LinearLR(

@@ -1,4 +1,4 @@
-"""DataModule for the CIFAR-10 dataset."""
+"""DataModule for the CIFAR-100 dataset."""
 
 # Imports Python packages.
 import numpy as np
@@ -7,7 +7,7 @@ import pickle
 
 # Imports PyTorch packages.
 from pl_bolts.transforms.dataset_normalizations import cifar10_normalization
-from torchvision.datasets import CIFAR10 as TorchvisionCIFAR10
+from torchvision.datasets import CIFAR100 as TorchvisionCIFAR100
 from torchvision.transforms import Compose, RandomCrop, RandomHorizontalFlip, ToTensor
 
 # Imports groundzero packages.
@@ -16,14 +16,14 @@ from groundzero.datamodules.datamodule import DataModule
 from groundzero.datamodules.disagreement import Disagreement
 
 
-class CIFAR10Dataset(Dataset, TorchvisionCIFAR10):
-    """Dataset for the CIFAR-10 dataset."""
+class CIFAR100Dataset(Dataset, TorchvisionCIFAR100):
+    """Dataset for the CIFAR-100 dataset."""
 
     def __init__(self, *xargs, **kwargs):
         Dataset.__init__(self, *xargs, **kwargs)
 
     def download(self):
-        return TorchvisionCIFAR10.download(self)
+        return TorchvisionCIFAR100.download(self)
 
     def load_data(self):
         if not self._check_integrity():
@@ -45,16 +45,16 @@ class CIFAR10Dataset(Dataset, TorchvisionCIFAR10):
                     self.targets.extend(entry["fine_labels"])
 
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
-        self.data = self.data.transpose((0, 2, 3, 1))  # HWC format for PIL
+        self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
         self.targets = np.asarray(self.targets)
 
         self._load_meta()
 
-class CIFAR10(DataModule):
-    """DataModule for the CIFAR-10 dataset."""
+class CIFAR100(DataModule):
+    """DataModule for the CIFAR-100 dataset."""
 
     def __init__(self, args, **kwargs):
-        super().__init__(args, CIFAR10Dataset, 10, **kwargs)
+        super().__init__(args, CIFAR100Dataset, 100, **kwargs)
 
     def augmented_transforms(self):
         transforms = Compose([
@@ -73,10 +73,4 @@ class CIFAR10(DataModule):
         ])
 
         return transforms
-
-class CIFAR10Disagreement(CIFAR10, Disagreement):
-    """DataModule for the CIFAR-10 Disagreement dataset."""
-
-    def __init__(self, args, **kwargs):
-        super().__init__(args, **kwargs)
 

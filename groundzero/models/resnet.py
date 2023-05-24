@@ -36,8 +36,10 @@ class ResNet(Model):
 
         # Reduces the kernel size and stride for smaller inputs, e.g., CIFAR-10
         # images (32 x 32) instead of ImageNet images (224 x 224).
+        self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         if args.resnet_small_input:
             self.model.conv1 = nn.Conv2d(args.input_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+            self.model.maxpool = nn.Identity()
 
         self.model.fc = nn.Sequential(
             nn.Dropout(p=args.dropout_prob, inplace=True),

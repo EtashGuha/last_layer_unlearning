@@ -1,15 +1,15 @@
+# 95.7% test acc
 accelerator: gpu
-batch_size: 256
-check_val_every_n_epoch: 10
-ckpt_every_n_epoch: 10
-cnn_initial_width: 64
-cnn_padding: 1
+batch_size: 128
+check_val_every_n_epoch: 100
+ckpt_every_n_epoch: 100
 datamodule: cifar10
 devices: 1
-dropout_prob: 0.5
 lr: 0.1
-lr_drop: 0.1
-lr_steps: [20, 40]
-max_epochs: 50
+lr_scheduler: cosine_warmup
+max_epochs: 300
 model: resnet
 resnet_small_input: True
+val_split: 0.1
+warmup_epochs: 5
+weight_decay: 5e-4

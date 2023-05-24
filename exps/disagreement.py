@@ -180,7 +180,7 @@ def print_metrics(metrics, test_group_proportions):
 def print_results(erm_metrics, results, keys, test_group_proportions):
     print("---Experiment Results---")
     print("\nERM")
-    print_metrics(erm_metrics)
+    print_metrics(erm_metrics, test_group_proportions)
 
     for key in keys:
         print(key.title())
@@ -274,7 +274,7 @@ def experiment(args, model_class):
 
         curr_erm["version"] = erm_version
         curr_erm["metrics"] = erm_metrics
-        dump_erm(curr_erm)
+        dump_erm(erm)
         del model
     elif not erm_metrics:
         args.weights = get_weights(erm_version, ind=-1)
@@ -282,7 +282,7 @@ def experiment(args, model_class):
 
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         curr_erm["metrics"] = erm_metrics
-        dump_erm(curr_erm)
+        dump_erm(erm)
 
     def print_metrics2(metrics):
         return print_metrics(metrics, args.test_group_proportions)
@@ -389,7 +389,7 @@ def experiment(args, model_class):
             finetune_lr=1e-2,
             finetune_num_data=100,
         )
-        print_results2(results, finetune_types[-1])
+        print_results2(results, finetune_types[-1:])
         return
 
     # Performs last-layer retraining.

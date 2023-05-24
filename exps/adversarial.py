@@ -127,12 +127,9 @@ def experiment(args):
     args.lr_steps = [50, 75]
 
     if args.model == "cnn":
-        #STEPS = [0, 5, 10, 20]
-        #WIDTHS = [16, 32, 64, 128, 256]
-        STEPS = [0]
-        WIDTHS = [256]
+        STEPS = [0, 5, 10, 20]
+        WIDTHS = [16, 32, 64, 128, 256]
 
-        """
         # ERM baseline
         accs = []
         for width in WIDTHS:
@@ -145,7 +142,6 @@ def experiment(args):
         plt.xscale("log", base=2)
         plt.savefig("erm.png", bbox_inches="tight")
         plt.clf()
-        """
 
         # Adversarial training
         accs = []
@@ -171,46 +167,6 @@ def experiment(args):
         print(accs)
         print(foscs)
         print(times)
-
-        """
-        for step_acc, step in zip(accs, STEPS):
-            if step != 0:
-                label = f"{step} steps"
-            else:
-                label = "ERM"
-            plt.plot(WIDTHS, step_acc, label=label)
-
-        plt.legend()
-        plt.xlabel("CNN initial width")
-        plt.ylabel("Adversarial accuracy")
-        plt.xscale("log", base=2)
-        plt.savefig("adv.png", bbox_inches="tight")
-        plt.clf()
-
-        for step_fosc, step in zip(foscs[1:], STEPS[1:]):
-            label = "f{step} steps"
-            plt.plot(WIDTHS, step_fosc, label=label)
-
-        plt.legend()
-        plt.xlabel("CNN initial width")
-        plt.ylabel("Last epoch FOSC")
-        plt.xscale("log", base=2)
-        plt.savefig("fosc.png", bbox_inches="tight")
-        plt.clf()
-
-        for step_time, step in zip(times, STEPS):
-            if step != 0:
-                label = f"{step} steps"
-            else:
-                label = "ERM"
-            plt.plot(WIDTHS, step_time, label=label)
-
-        plt.legend()
-        plt.xlabel("CNN initial width")
-        plt.ylabel("Wall-clock adversarial training time")
-        plt.savefig("time.png", bbox_inches="tight")
-        plt.clf()
-        """
 
     elif args.model == "resnet":
         main(args, AdversarialResNet, CIFAR10)
