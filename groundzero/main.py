@@ -131,7 +131,6 @@ def main(
     datamodule_class,
     callbacks=None,
     model_hooks=None,
-    eval_only=False, 
     verbose=True,
 ):
     """Main method for training and validation.
@@ -164,7 +163,7 @@ def main(
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
 
-    if not eval_only:
+    if not args.eval_only:
         trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
 
     val_metrics = trainer.validate(model, datamodule=datamodule, verbose=verbose)

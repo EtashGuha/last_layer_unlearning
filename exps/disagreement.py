@@ -268,6 +268,7 @@ def experiment(args, model_class):
         args.balanced_sampler = True if args.balance_erm else False
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class)
         args.balanced_sampler = False
+        return
 
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
@@ -278,7 +279,9 @@ def experiment(args, model_class):
         del model
     elif not erm_metrics:
         args.weights = get_weights(erm_version, ind=-1)
-        _, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class, eval_only=True)
+        args.eval_only = True
+        _, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class)
+        args.eval_only = False
 
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         curr_erm["metrics"] = erm_metrics

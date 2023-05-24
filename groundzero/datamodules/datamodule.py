@@ -111,15 +111,10 @@ class DataModule(VisionDataModule):
 
         return msg
 
-    def train_preprocess(self, dataset_train, dataset_val):
+    def train_preprocess(self, dataset_train):
         """Preprocesses train and val datasets. Here, injects label noise.
 
         Args:
-            dataset_train: A torchvision.datasets.VisionDataset for training.
-            dataset_val: A torchvision.datasets.VisionDataset for validation.
-
-        Returns:
-            The modified train and val datasets.
         """
 
         if self.label_noise:
@@ -145,7 +140,12 @@ class DataModule(VisionDataModule):
                 labels = [j for j in range(self.num_classes) if j != i]
                 dataset_train.targets[i] = random.choice(labels)
 
-        return dataset_train, dataset_val
+        return dataset_train
+
+    def val_preprocess(self, dataset_val):
+        """Preprocesses val dataset. Does nothing here, but can be overriden."""
+
+        return dataset_val
 
     def test_preprocess(self, dataset_test):
         """Preprocesses test dataset. Does nothing here, but can be overidden.
@@ -160,37 +160,33 @@ class DataModule(VisionDataModule):
         return dataset_test
 
     def setup(self, stage=None):
-        """Instantiates and preprocesses datasets.
-        
-        Args:
-            stage: The stage of training; either "fit", "test", or None (both).
-        """
+        """Instantiates and preprocesses datasets."""
 
-        if stage == "fit" or stage is None:
-            dataset_train = self.dataset_class(
-                self.data_dir,
-                train=True,
-                transform=self.train_transforms,
-            )
+        dataset_train = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.train_transforms,
+        )
 
-            dataset_val = self.dataset_class(
-                self.data_dir,
-                train=True,
-                transform=self.val_transforms,
-            )
+        dataset_val = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.val_transforms,
+        )
 
-            dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
-            self.dataset_train = self._split_dataset(dataset_train)
-            self.dataset_val = self._split_dataset(dataset_val, val=True)
+        dataset_test = self.dataset_class(
+            self.data_dir,
+            train=False,
+            transform=self.test_transforms,
+        )
+
+        dataset_train = self.train_preprocess(dataset_train)
+        self.dataset_train = self._split_dataset(dataset_train)
+
+        dataset_val = self.val_preprocess(dataset_val)
+        self.dataset_val = self._split_dataset(dataset_val, val=True)
             
-        if stage == "test" or stage is None:
-            dataset_test = self.dataset_class(
-                self.data_dir,
-                train=False,
-                transform=self.test_transforms,
-            )
-
-            self.dataset_test = self.test_preprocess(dataset_test)
+        self.dataset_test = self.test_preprocess(dataset_test)
 
     def _split_dataset(self, dataset, val=False):
         """Splits dataset into training and validation subsets.

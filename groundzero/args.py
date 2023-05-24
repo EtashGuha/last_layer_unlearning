@@ -44,6 +44,7 @@ def add_input_args(parser):
     parser.add("--data_dir", default="data")
     parser.add("--datamodule", choices=datamodule_names)
     parser.add("--dropout_prob", default=0, type=float)
+    parser.add("--eval_only", default=False, type=lambda x: bool(strtobool(x)))
     parser.add("--input_channels", default=3, type=int)
     parser.add("--label_noise", default=0, type=float)
     parser.add("--loss", choices=["cross_entropy", "mse"], default="cross_entropy")

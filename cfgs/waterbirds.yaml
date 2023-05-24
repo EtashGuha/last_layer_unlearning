@@ -1,3 +1,4 @@
+# 89.3% test acc
 accelerator: gpu
 batch_size: 32
 check_val_every_n_epoch: 10
@@ -10,3 +11,4 @@ lr_scheduler: cosine
 max_epochs: 100
 model: resnet
 refresh_rate: 150
+resnet_version: 50

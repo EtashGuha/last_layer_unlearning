@@ -10,3 +10,4 @@ lr_scheduler: cosine
 max_epochs: 20
 model: resnet
 refresh_rate: 1000
+resnet_version: 50

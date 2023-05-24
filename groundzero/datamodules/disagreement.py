@@ -428,9 +428,6 @@ class Disagreement(DataModule):
 
         Performs disagreement if self.model (i.e., the model which calculates
         disagreements) is specified.
-        
-        Args:
-            stage: The stage of training; either "fit", "test", or None (both).
         """
 
         dataset_train = self.dataset_class(
@@ -459,10 +456,9 @@ class Disagreement(DataModule):
         dataset_test = self.test_preprocess(dataset_test)
         self.dataset_test = dataset_test
         
-        if stage == "fit" or stage is None:
-            # Performs disagreement and sets new train dataset.
-            if self.model:
-                print("Computing disagreements...")
-                self.disagreement()
-                del self.model
+        # Performs disagreement and sets new train dataset.
+        if self.model:
+            print("Computing disagreements...")
+            self.disagreement()
+            del self.model
 
