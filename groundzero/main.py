@@ -162,7 +162,6 @@ def main(
             hook(model)
 
     trainer = load_trainer(args, addtl_callbacks=callbacks)
-
     if not args.eval_only:
         trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
 

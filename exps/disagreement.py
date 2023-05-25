@@ -92,6 +92,7 @@ def set_training_parameters(args):
         args.finetune_epochs_scale = None
         args.finetune_lrs = None
         args.test_group_proportions = np.array([0.1] * 10)
+        args.val_split = 0.2
     else:
         raise ValueError(f"DataModule {args.datamodule} not supported.")
 
@@ -149,8 +150,8 @@ def print_metrics(metrics, test_group_proportions):
     if "test_acc1" in test_metrics[0]:
         test_avg_acc = test_metrics[0]["test_acc1"]
         test_worst_class_acc = test_metrics[0]["test_worst_class_acc1"]
-        print(f"Test Average Acc: {test_avg_acc}")
-        print(f"Test Worst Class Acc: {test_worst_class_acc}")
+        print(f"Test Average Acc: {round(test_avg_acc * 100, 1)}")
+        print(f"Test Worst Class Acc: {round(test_worst_class_acc * 100, 1)}")
         print()
         return
 
@@ -263,12 +264,10 @@ def experiment(args, model_class):
     # Trains ERM model.
     erm_version = curr_erm["version"]
     erm_metrics = curr_erm["metrics"]
-    erm_version = -1
     if erm_version == -1:
         args.balanced_sampler = True if args.balance_erm else False
         model, erm_val_metrics, erm_test_metrics = main(args, model_class, args.datamodule_class)
         args.balanced_sampler = False
-        return
 
         erm_version = model.trainer.logger.version
         erm_metrics = [erm_val_metrics, erm_test_metrics]
@@ -293,6 +292,7 @@ def experiment(args, model_class):
     def print_results2(results, keys):
         return print_results(erm_metrics, results, keys, args.test_group_proportions)
 
+    print("ERM")
     print_metrics2(erm_metrics)
 
     # When these two arguments are passed, the entire held-out set

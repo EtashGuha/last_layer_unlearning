@@ -1,13 +1,13 @@
-# 96.0% test acc
+# 96.3% test acc
 accelerator: gpu
 batch_size: 128
-check_val_every_n_epoch: 100
-ckpt_every_n_epoch: 100
+check_val_every_n_epoch: 50
+ckpt_every_n_epoch: 50
 datamodule: cifar10
 devices: 1
 lr: 0.1
 lr_scheduler: cosine_warmup
-max_epochs: 200
+max_epochs: 100
 model: resnet
 resnet_small_input: True
 val_split: 0.1

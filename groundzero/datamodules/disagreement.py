@@ -449,16 +449,18 @@ class Disagreement(DataModule):
         )
 
         # Creates disagreement sets in addition to regular train/val split.
-        dataset_train, dataset_val = self.train_preprocess(dataset_train, dataset_val)
+        dataset_train = self.train_preprocess(dataset_train)
+        dataset_val = self.val_preprocess(dataset_val)
         self.dataset_train, self.dataset_disagreement, self.dataset_val = \
             self._split_dataset(dataset_train, dataset_val)
 
         dataset_test = self.test_preprocess(dataset_test)
         self.dataset_test = dataset_test
         
-        # Performs disagreement and sets new train dataset.
-        if self.model:
-            print("Computing disagreements...")
-            self.disagreement()
-            del self.model
+        if stage == "fit":
+            # Performs disagreement and sets new train dataset.
+            if self.model:
+                print("Computing disagreements...")
+                self.disagreement()
+                del self.model
 
