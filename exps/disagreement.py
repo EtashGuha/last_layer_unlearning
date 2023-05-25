@@ -93,6 +93,7 @@ def set_training_parameters(args):
         args.finetune_lrs = None
         args.test_group_proportions = np.array([0.1] * 10)
         args.val_split = 0.2
+        args.split = "combined"
     else:
         raise ValueError(f"DataModule {args.datamodule} not supported.")
 
@@ -128,12 +129,12 @@ def load_erm():
 
     return erm
 
-def dump_erm(new_erm):
-    old_erm = load_erm()
-    new_erm = old_erm | new_erm
+def dump_erm(args, curr_erm):
+    erm = load_erm()
+    erm[args.datamodule][args.seed][args.balance_erm][args.split][args.train_pct] = curr_erm
 
     with open("erm.pkl", "wb") as f:
-        pickle.dump(new_erm, f)
+        pickle.dump(erm, f)
 
 def reset_fc_hook(model):
     try:
@@ -256,12 +257,12 @@ def finetune_last_layer(
 def experiment(args, model_class):
     # Loads ERM paths and metrics from pickle file.
     erm = load_erm()
-    curr_erm = erm[args.datamodule][args.seed][args.balance_erm][args.split][args.train_pct]
-
+    
     # Adds experiment-specific parameters to args.
     set_training_parameters(args)
 
     # Trains ERM model.
+    curr_erm = erm[args.datamodule][args.seed][args.balance_erm][args.split][args.train_pct]
     erm_version = curr_erm["version"]
     erm_metrics = curr_erm["metrics"]
     if erm_version == -1:
@@ -274,8 +275,9 @@ def experiment(args, model_class):
 
         curr_erm["version"] = erm_version
         curr_erm["metrics"] = erm_metrics
-        dump_erm(erm)
+        dump_erm(args, curr_erm)
         del model
+
     elif not erm_metrics:
         args.weights = get_weights(erm_version, ind=-1)
         args.eval_only = True
@@ -284,7 +286,7 @@ def experiment(args, model_class):
 
         erm_metrics = [erm_val_metrics, erm_test_metrics]
         curr_erm["metrics"] = erm_metrics
-        dump_erm(erm)
+        dump_erm(args, curr_erm)
 
     def print_metrics2(metrics):
         return print_metrics(metrics, args.test_group_proportions)
