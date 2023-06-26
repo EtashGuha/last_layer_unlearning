@@ -1,13 +1,16 @@
 # 94.0% test acc
 accelerator: gpu
-batch_size: 128
-check_val_every_n_epoch: 50
+batch_size: 4
+check_val_every_n_epoch: 5
 ckpt_every_n_epoch: 50
 datamodule: cifar10
 devices: 1
 lr: 0.05
-max_epochs: 20
+max_epochs: 200
 model: resnet
 resnet_small_input: True
 val_split: 0.1
 weight_decay: 0
+# mlp_num_layers: 5
+# mlp_hidden_dim: 3000
+bias: False

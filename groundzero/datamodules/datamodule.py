@@ -7,14 +7,14 @@ import random
 
 # Imports Python packages.
 import numpy as np
-
+import torch
 # Imports PyTorch packages.
 from torch import Generator, randperm
 from torch.utils.data import DataLoader, WeightedRandomSampler
 from pl_bolts.datamodules.vision_datamodule import VisionDataModule
 
 # Imports groundzero packages.
-from groundzero.datamodules.dataset import Subset
+from groundzero.datamodules.dataset import Subset, Dataset
 from groundzero.utils import random_split
 
 
@@ -62,7 +62,6 @@ class DataModule(VisionDataModule):
 
         self.dataset_class = dataset_class
         self.num_classes = num_classes
-        
         self.balanced_sampler = args.balanced_sampler
         self.data_augmentation = args.data_augmentation
         self.label_noise = args.label_noise
@@ -141,10 +140,17 @@ class DataModule(VisionDataModule):
                 dataset_train.targets[i] = random.choice(labels)
 
         return dataset_train
+    
 
     def val_preprocess(self, dataset_val):
         """Preprocesses val dataset. Does nothing here, but can be overriden."""
-
+        val_indices =  self.labelfy_dataset(dataset_val)
+        dataset_val = self.dataset_class(
+            self.data_dir,
+            train=True,
+            transform=self.val_transforms,
+            groups = val_indices
+        )
         return dataset_val
 
     def test_preprocess(self, dataset_test):
@@ -157,7 +163,15 @@ class DataModule(VisionDataModule):
             The modified test dataset.
         """
 
+        test_indices =  self.labelfy_dataset(dataset_test)
+        dataset_test = self.dataset_class(
+            self.data_dir,
+            train=False,
+            transform=self.test_transforms,
+            groups = test_indices
+        )
         return dataset_test
+
 
     def setup(self, stage=None):
         """Instantiates and preprocesses datasets."""
@@ -188,6 +202,25 @@ class DataModule(VisionDataModule):
             
         self.dataset_test = self.test_preprocess(dataset_test)
 
+    def labelfy_dataset(self, dataset):
+        # Get unique labels in the dataset
+        targets = dataset.targets
+        unique_labels = torch.unique(torch.tensor(targets))
+
+        train_indices = []
+        # Split each label's indices into train and validation indices
+        for label in unique_labels:
+            indices = torch.where(torch.tensor(targets) == label)[0]
+            num_samples = len(indices)
+            # Randomly shuffle the indices
+            shuffled_indices = torch.randperm(num_samples)
+
+            # Split the shuffled indices into train and validation indices
+            train_indices.append(indices[shuffled_indices])
+            
+        return train_indices
+
+
     def _split_dataset(self, dataset, val=False):
         """Splits dataset into training and validation subsets.
         
@@ -217,7 +250,7 @@ class DataModule(VisionDataModule):
             return dataset_val
         return dataset_train
 
-    def train_dataloader(self):
+    def train_dataloader(self, indices=None, shuffle =None):
         """Returns DataLoader for the train dataset."""
 
         if self.balanced_sampler:
@@ -232,7 +265,15 @@ class DataModule(VisionDataModule):
 
             return self._data_loader(self.dataset_train, sampler=sampler)
 
-        return self._data_loader(self.dataset_train, shuffle=self.shuffle)
+        
+        if indices is not None and shuffle is not None:
+            return self._data_loader(Subset(self.dataset_train, indices), shuffle=shuffle)
+        elif indices is not None and shuffle is None:
+            return self._data_loader(Subset(self.dataset_train, indices), shuffle=self.shuffle)
+        elif indices is None and shuffle is not None:
+            return self._data_loader(self.dataset_train, shuffle=shuffle)
+        elif indices is None and shuffle is None:
+            return self._data_loader(self.dataset_train, shuffle=self.shuffle)
 
     def val_dataloader(self):
         """Returns DataLoader(s) for the val dataset."""
@@ -254,6 +295,7 @@ class DataModule(VisionDataModule):
             for group in self.dataset_test.groups:
                 dataloaders.append(self._data_loader(Subset(self.dataset_test, group)))
             return dataloaders
+            
         return self._data_loader(self.dataset_test)
 
     def _data_loader(self, dataset, shuffle=False, sampler=None):

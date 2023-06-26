@@ -4,7 +4,7 @@
 import torch
 from torchvision.datasets import MNIST as TorchVisionMNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
-
+from torch.utils.data import Subset, DataLoader
 # Imports groundzero packages.
 from groundzero.datamodules.datamodule import DataModule
 from groundzero.datamodules.dataset import Dataset
@@ -34,4 +34,5 @@ class MNIST(DataModule):
 
     def default_transforms(self):
         return Normalize(mean=(0.5,), std=(0.5,))
+    
 

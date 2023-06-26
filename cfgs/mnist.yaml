@@ -1,14 +1,18 @@
-# 98.5% test acc
 accelerator: gpu
 batch_size: 256
-check_val_every_n_epoch: 10
-ckpt_every_n_epoch: 10
+check_val_every_n_epoch: 20
+ckpt_every_n_epoch: 20
 cnn_initial_width: 16
-cnn_num_layers: 3
-data_augmentation: False
+cnn_num_layers: 1
 datamodule: mnist
 devices: 1
+dropout_prob: 0.5
 input_channels: 1
-lr: 0.1
-max_epochs: 10
+lr: 0.02
+max_epochs: 100
+mlp_input_dim: 784
 model: cnn
+mlp_num_layers: 5
+mlp_hidden_dim: 700
+bias: False
+model_path: data/model_pths/mlp_mnist.pth

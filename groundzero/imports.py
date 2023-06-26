@@ -26,6 +26,5 @@ def valid_models_and_datamodules():
     datamodules = [groundzero.datamodules.__dict__[name].__dict__ for name in datamodule_names]
     datamodules = [dict((k.lower(), v) for k, v in d.items()) for d in datamodules]
     datamodules = {name: datamodules[j][name.replace("_", "")] for j, name in enumerate(datamodule_names)} 
-
     return models, datamodules
 

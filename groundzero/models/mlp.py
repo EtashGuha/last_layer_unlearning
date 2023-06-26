@@ -9,7 +9,7 @@ from groundzero.models.model import Model
 
 
 def relu():
-    return nn.ReLU(inplace=True)
+    return nn.ReLU(inplace=False)
 
 class MLP(Model):
     """MLP model implementation.
@@ -40,7 +40,7 @@ class MLP(Model):
             else:
                 self.model.append(nn.Linear(n, k, bias=args.bias))
                 self.model.append(activation())
-                self.model.append(nn.Dropout(p=args.dropout_prob, inplace=True))
+                self.model.append(nn.Dropout(p=args.dropout_prob, inplace=False))
                 
         if args.train_fc_only:
             for p in self.model.parameters():

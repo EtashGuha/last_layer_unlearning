@@ -39,6 +39,7 @@ class Dataset(VisionDataset):
         transform=None,
         target_transform=None, 
         download=False,
+        groups=None
     ):
         """Initializes a Dataset and downloads to disk if requested.
 
@@ -69,8 +70,8 @@ class Dataset(VisionDataset):
         self.train_indices = None
         self.val_indices = None
         self.test_indices = None
-        self.groups = None
-
+        self.groups = groups
+        # self.download()
         if download:
             self.download()
 

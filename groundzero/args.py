@@ -57,6 +57,7 @@ def add_input_args(parser):
     parser.add("--mlp_input_dim", default=3072, type=int)
     parser.add("--mlp_num_layers", default=3, type=int)
     parser.add("--model", choices=model_names)
+    parser.add("--model_path", type=str)
     parser.add("--momentum", default=0.9, type=float)
     parser.add("--nin_num_layers", default=2, type=int)
     parser.add("--nin_padding", default=1, type=int)

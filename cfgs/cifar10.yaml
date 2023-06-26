@@ -1,6 +1,6 @@
 # 96.3% test acc
 accelerator: gpu
-batch_size: 128
+batch_size: 16
 check_val_every_n_epoch: 50
 ckpt_every_n_epoch: 50
 datamodule: cifar10
@@ -13,3 +13,5 @@ resnet_small_input: True
 val_split: 0.1
 warmup_epochs: 5
 weight_decay: 5e-4
+bias: false
+model_path: data/model_pths/cifar10_100epochs.pth
